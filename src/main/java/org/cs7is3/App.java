@@ -1,6 +1,5 @@
 package org.cs7is3;
 
-// TODO: Implement your main application class
 // This class should handle command-line arguments and coordinate between Indexer and Searcher
 // 
 // Required command-line interface:
@@ -13,10 +12,22 @@ package org.cs7is3;
 // 3. Search command to produce a TREC-format run file with exactly 1000 results per topic
 // 4. Output format: "topic_id Q0 docno rank score run_tag"
 
+import java.io.IOException;
+
 public class App {
-    public static void main(String[] args) {
-        // TODO: Implement your main method
-        // Parse command-line arguments and delegate to Indexer/Searcher
-        System.out.println("TODO: Implement your search engine application");
+    public static void main(String[] args) throws ArgsParser.ArgsParsingException, IOException {
+        var parsedArgs = ArgsParser.parse(args);
+        if (parsedArgs.hasIndexArgs()) {
+            var indexer = new Indexer();
+            indexer.buildIndex(parsedArgs.indexArgs().docs(), parsedArgs.indexArgs().index());
+        } else if (parsedArgs.hasSearchArgs()) {
+            var searcher = new Searcher();
+            searcher.searchTopics(
+                    parsedArgs.searchArgs().index(),
+                    parsedArgs.searchArgs().topics(),
+                    parsedArgs.searchArgs().output(),
+                    parsedArgs.searchArgs().numDocs()
+            );
+        }
     }
 }
