@@ -14,7 +14,7 @@ class ArgsParser {
 
     static Args parse(String[] rawArgs) throws ArgsParsingException {
         if (rawArgs.length == 0) {
-            throw new ArgsParsingException();
+            throw new ArgsParsingException("Failed to parse arguments");
         }
 
         var mode = Args.Mode.fromRaw(rawArgs[0]);
@@ -115,10 +115,6 @@ class ArgsParser {
                 General options:
                     -h, --help  Display this message and exit
                 """;
-
-        private ArgsParsingException() {
-            this("Failed to parse arguments");
-        }
 
         private ArgsParsingException(String message) {
             super(String.format("%s\n%s", message, USAGE));
