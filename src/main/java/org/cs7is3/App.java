@@ -17,16 +17,16 @@ import java.io.IOException;
 public class App {
     public static void main(String[] args) throws ArgsParser.ArgsParsingException, IOException {
         var parsedArgs = ArgsParser.parse(args);
-        if (parsedArgs.hasIndexArgs()) {
+        if (parsedArgs.hasIndex()) {
             var indexer = new Indexer();
-            indexer.buildIndex(parsedArgs.indexArgs().docs(), parsedArgs.indexArgs().index());
-        } else if (parsedArgs.hasSearchArgs()) {
+            indexer.buildIndex(parsedArgs.index().docs(), parsedArgs.index().index());
+        } else if (parsedArgs.hasSearch()) {
             var searcher = new Searcher();
             searcher.searchTopics(
-                    parsedArgs.searchArgs().index(),
-                    parsedArgs.searchArgs().topics(),
-                    parsedArgs.searchArgs().output(),
-                    parsedArgs.searchArgs().numDocs()
+                    parsedArgs.search().index(),
+                    parsedArgs.search().topics(),
+                    parsedArgs.search().output(),
+                    parsedArgs.search().numDocs()
             );
         }
     }

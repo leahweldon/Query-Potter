@@ -27,21 +27,21 @@ class ArgsParser {
         }
         if (mode.equals(Args.Mode.INDEX)) {
             var namedArgs = parse(rawArgs, INDEX_ARGS, Set.of());
-            var indexArgs = new IndexArgs(
+            var index = new Args.Index(
                     /* docs= */ parsePath(namedArgs.get("--docs")),
                     /* index= */ parsePath(namedArgs.get("--index"))
             );
-            return new Args(mode, indexArgs, null);
+            return new Args(mode, index, null);
         }
 
         var namedArgs = parse(rawArgs, SEARCH_ARGS, Set.of("--numDocs"));
-        var searchArgs = new SearchArgs(
+        var search = new Args.Search(
                 /* index= */ parsePath(namedArgs.get("--index")),
                 /* topics= */ parsePath(namedArgs.get("--topics")),
                 /* output= */ parsePath(namedArgs.get("--output")),
                 /* numDocs= */ parseInt(namedArgs.getOrDefault("--numDocs", "1000"))
         );
-        return new Args(Args.Mode.SEARCH, null, searchArgs);
+        return new Args(Args.Mode.SEARCH, null, search);
     }
 
     private static Map<String, String> parse(String[] rawArgs, Set<String> argNames, Set<String> optionalArgs) throws ArgsParsingException {
@@ -121,7 +121,7 @@ class ArgsParser {
         }
     }
 
-    record Args(Mode mode, IndexArgs indexArgs, SearchArgs searchArgs) {
+    record Args(Mode mode, Index index, Search search) {
         enum Mode {
             INDEX, SEARCH, HELP;
 
@@ -134,18 +134,18 @@ class ArgsParser {
             }
         }
 
-        boolean hasIndexArgs() {
-            return mode.equals(Mode.INDEX) && indexArgs != null;
+        record Index(Path docs, Path index) {
         }
 
-        boolean hasSearchArgs() {
-            return mode.equals(Mode.SEARCH) && searchArgs != null;
+        record Search(Path index, Path topics, Path output, int numDocs) {
         }
-    }
 
-    record IndexArgs(Path docs, Path index) {
-    }
+        boolean hasIndex() {
+            return mode.equals(Mode.INDEX) && index != null;
+        }
 
-    record SearchArgs(Path index, Path topics, Path output, int numDocs) {
+        boolean hasSearch() {
+            return mode.equals(Mode.SEARCH) && search != null;
+        }
     }
 }
