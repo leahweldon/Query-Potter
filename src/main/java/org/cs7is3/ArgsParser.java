@@ -1,13 +1,22 @@
 package org.cs7is3;
 
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 class ArgsParser {
-    private static final Set<String> INDEX_ARGS = Set.of("--docs", "--index");
-    private static final Set<String> SEARCH_ARGS = Set.of("--index", "--topics", "--output", "--numDocs");
+    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(
+            ArgSpec.required("--docs", Paths::get),
+            ArgSpec.required("--index", Paths::get)
+    );
+    private static final List<ArgSpec<?>> SEARCH_ARGS = List.of(
+            ArgSpec.required("--index", Paths::get),
+            ArgSpec.required("--topics", Paths::get),
+            ArgSpec.required("--output", Paths::get),
+            ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, 1_000)
+    );
 
     private ArgsParser() {
     }
@@ -26,66 +35,53 @@ class ArgsParser {
             return new Args(Args.Mode.HELP, null, null);
         }
         if (mode.equals(Args.Mode.INDEX)) {
-            var namedArgs = parse(rawArgs, INDEX_ARGS, Set.of());
-            var index = new Args.Index(
-                    /* docs= */ parsePath(namedArgs.get("--docs")),
-                    /* index= */ parsePath(namedArgs.get("--index"))
-            );
+            var args = parse(rawArgs, INDEX_ARGS);
+            var index = new Args.Index(args.get("--docs", Path.class), args.get("--index", Path.class));
             return new Args(mode, index, null);
         }
 
-        var namedArgs = parse(rawArgs, SEARCH_ARGS, Set.of("--numDocs"));
+        var args = parse(rawArgs, SEARCH_ARGS);
         var search = new Args.Search(
-                /* index= */ parsePath(namedArgs.get("--index")),
-                /* topics= */ parsePath(namedArgs.get("--topics")),
-                /* output= */ parsePath(namedArgs.get("--output")),
-                /* numDocs= */ parseInt(namedArgs.getOrDefault("--numDocs", "1000"))
+                /* index= */ args.get("--index", Path.class),
+                /* topics= */ args.get("--topics", Path.class),
+                /* output= */ args.get("--output", Path.class),
+                /* numDocs= */ args.get("--numDocs", Integer.class)
         );
         return new Args(Args.Mode.SEARCH, null, search);
     }
 
-    private static Map<String, String> parse(String[] rawArgs, Set<String> argNames, Set<String> optionalArgs) throws ArgsParsingException {
-        var args = new HashMap<String, String>(argNames.size());
+    private static ParsedArgs parse(String[] rawArgs, List<ArgSpec<?>> specs) throws ArgsParsingException {
+        var parsed = new HashMap<String, Object>(specs.size());
+        var namedSpecs = specs.stream().collect(Collectors.toMap(ArgSpec::name, Function.identity()));
 
         for (var i = 1; i < rawArgs.length; i++) {
             var arg = rawArgs[i];
-            if (argNames.contains(arg)) {
-                if (args.containsKey(arg)) {
-                    throw new ArgsParsingException(String.format("Duplicate arg: '%s'", arg));
-                }
-                if (i == rawArgs.length - 1) {
-                    throw new ArgsParsingException(String.format("Expecting value for '%s'", arg));
-                }
+            var spec = namedSpecs.get(arg);
 
-                args.put(arg, rawArgs[++i]);
+            if (spec == null) {
+                // Arg is unrecognised so we skip it
+                continue;
+            }
+            if (parsed.containsKey(arg)) {
+                throw new ArgsParsingException(String.format("Duplicate arg: '%s'", arg));
+            }
+            if (i == rawArgs.length - 1) {
+                throw new ArgsParsingException(String.format("Expecting value for '%s'", arg));
+            }
+
+            parsed.put(arg, spec.parse(rawArgs[++i]));
+        }
+
+        for (var spec : specs) {
+            if (!parsed.containsKey(spec.name())) {
+                if (!spec.optional()) {
+                    throw new ArgsParsingException(String.format("Expected '%s' to be present", spec.name()));
+                }
+                parsed.put(spec.name(), spec.defaultValue());
             }
         }
 
-        if (args.size() != argNames.size() && !optionalArgs.isEmpty()) {
-            for (var arg : argNames) {
-                if (!args.containsKey(arg) && !optionalArgs.contains(arg)) {
-                    throw new ArgsParsingException(String.format("Expected '%s' to be present", arg));
-                }
-            }
-        }
-
-        return args;
-    }
-
-    private static Path parsePath(String path) throws ArgsParsingException {
-        try {
-            return Paths.get(path);
-        } catch (InvalidPathException ignored) {
-            throw new ArgsParsingException(String.format("Path '%s' could not be parsed", path));
-        }
-    }
-
-    private static int parseInt(String value) throws ArgsParsingException {
-        try {
-            return Integer.parseUnsignedInt(value);
-        } catch (NumberFormatException ignored) {
-            throw new ArgsParsingException(String.format("Number '%s' could not be parsed as an unsigned integer", value));
-        }
+        return new ParsedArgs(parsed);
     }
 
     public static final class ArgsParsingException extends Exception {
@@ -146,6 +142,38 @@ class ArgsParser {
 
         boolean hasSearch() {
             return mode.equals(Mode.SEARCH) && search != null;
+        }
+    }
+
+    private record ArgSpec<T>(String name, Function<String, T> parser, T defaultValue) {
+        static <T> ArgSpec<T> optional(String name, Function<String, T> parser, T defaultValue) {
+            return new ArgSpec<>(name, parser, defaultValue);
+        }
+
+        static <T> ArgSpec<T> required(String name, Function<String, T> parser) {
+            return new ArgSpec<>(name, parser, null);
+        }
+
+        boolean optional() {
+            return defaultValue != null;
+        }
+
+        T parse(String raw) throws ArgsParsingException {
+            try {
+                return parser.apply(raw);
+            } catch (Exception swallowed) {
+                throw new ArgsParsingException(String.format("Could not parse value for '%s': '%s'", name, raw));
+            }
+        }
+    }
+
+    private record ParsedArgs(Map<String, ?> args) {
+        <T> T get(String name, Class<T> clazz) throws ArgsParsingException {
+            var value = args.get(name);
+            if (!clazz.isInstance(value)) {
+                throw new ArgsParsingException(String.format("Invalid format for '%s': '%s'", name, value));
+            }
+            return clazz.cast(value);
         }
     }
 }
