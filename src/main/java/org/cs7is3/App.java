@@ -30,4 +30,12 @@ public class App {
             );
         }
     }
+
+    enum AnalyzerMode {
+        ENGLISH
+    }
+
+    enum SimilarityMode {
+        BM25
+    }
 }

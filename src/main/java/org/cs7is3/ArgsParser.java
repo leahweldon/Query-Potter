@@ -5,14 +5,17 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 class ArgsParser {
-    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(
-            ArgSpec.required("--docs", Paths::get),
-            ArgSpec.required("--index", Paths::get)
-    );
+    private static final ArgSpec<Path> INDEX_ARG = ArgSpec.required("--index", Paths::get);
+    private static final ArgSpec<App.AnalyzerMode> ANALYZER_ARG =
+            ArgSpec.optional("--analyzer", App.AnalyzerMode::valueOf, App.AnalyzerMode.ENGLISH);
+    private static final ArgSpec<App.SimilarityMode> SIMILARITY_ARG =
+            ArgSpec.optional("--similarity", App.SimilarityMode::valueOf, App.SimilarityMode.BM25);
+    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(ArgSpec.required("--docs", Paths::get), INDEX_ARG);
     private static final List<ArgSpec<?>> SEARCH_ARGS = List.of(
-            ArgSpec.required("--index", Paths::get),
+            INDEX_ARG,
             ArgSpec.required("--topics", Paths::get),
             ArgSpec.required("--output", Paths::get),
             ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, 1_000)
@@ -32,12 +35,12 @@ class ArgsParser {
             System.exit(0);
             // We have to have this return statement to satisfy the compiler. In reality the program will terminate so
             // this return value is useless.
-            return new Args(Args.Mode.HELP, null, null);
+            return new Args(Args.Mode.HELP, null, null, null, null);
         }
         if (mode.equals(Args.Mode.INDEX)) {
             var args = parse(rawArgs, INDEX_ARGS);
             var index = new Args.Index(args.get("--docs", Path.class), args.get("--index", Path.class));
-            return new Args(mode, index, null);
+            return new Args(mode, index, null, args.get("--analyzer", App.AnalyzerMode.class), args.get("--similarity", App.SimilarityMode.class));
         }
 
         var args = parse(rawArgs, SEARCH_ARGS);
@@ -47,11 +50,13 @@ class ArgsParser {
                 /* output= */ args.get("--output", Path.class),
                 /* numDocs= */ args.get("--numDocs", Integer.class)
         );
-        return new Args(Args.Mode.SEARCH, null, search);
+        return new Args(Args.Mode.SEARCH, null, search, args.get("--analyzer", App.AnalyzerMode.class), args.get("--similarity", App.SimilarityMode.class));
     }
 
-    private static ParsedArgs parse(String[] rawArgs, List<ArgSpec<?>> specs) throws ArgsParsingException {
-        var parsed = new HashMap<String, Object>(specs.size());
+    private static ParsedArgs parse(String[] rawArgs, List<ArgSpec<?>> baseSpecs) throws ArgsParsingException {
+        var parsed = new HashMap<String, Object>(baseSpecs.size());
+        var specs = Stream.concat(baseSpecs.stream(), Stream.of(ANALYZER_ARG, SIMILARITY_ARG))
+                .collect(Collectors.toUnmodifiableSet());
         var namedSpecs = specs.stream().collect(Collectors.toMap(ArgSpec::name, Function.identity()));
 
         for (var i = 1; i < rawArgs.length; i++) {
@@ -93,17 +98,21 @@ class ArgsParser {
                     help     Print this message and exit
                 
                 Options for `index`:
-                    --docs <path>   Path to the directory containing the documents
-                    --index <path>  Path to where the index will be stored
+                    --docs <path>               Path to the directory containing the documents
+                    --index <path>              Path to where the index will be stored
+                    --analyzer <analyzer>       The analyzer to use. Should match the index analyzer (default: ENGLISH)
+                    --similarity <similarity>   The similarity scorer to use. Should match the index similarity (default: BM25)
                 
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar index --docs "Assignment Two" --index index
                 
                 Options for `search`:
-                    --index <path>  Path to the existing index for searching
-                    --topics <path> Path to the topics file to generate queries from
-                    --output <path> Path to where the search results should be saved
-                    --numDocs <int> Maximum number of documents to retrieve per topic (default: 1000)
+                    --index <path>              Path to the existing index for searching
+                    --topics <path>             Path to the topics file to generate queries from
+                    --output <path>             Path to where the search results should be saved
+                    --numDocs <int>             Maximum number of documents to retrieve per topic (default: 1000)
+                    --analyzer <analyzer>       The analyzer to use. Should match the index analyzer (default: ENGLISH)
+                    --similarity <similarity>   The similarity scorer to use. Should match the index similarity (default: BM25)
                 
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar search --index index --topics topics --output runs/student.run --numDocs 1000
@@ -117,7 +126,7 @@ class ArgsParser {
         }
     }
 
-    record Args(Mode mode, Index index, Search search) {
+    record Args(Mode mode, Index index, Search search, App.AnalyzerMode analyzer, App.SimilarityMode similarity) {
         enum Mode {
             INDEX, SEARCH, HELP;
 
