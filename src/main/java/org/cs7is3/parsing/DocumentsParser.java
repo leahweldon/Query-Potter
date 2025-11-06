@@ -15,7 +15,7 @@ public class DocumentsParser {
     // latimes subdirectories within the provided directory, and parses all files into the same document structure,
     // returning a lazily evaluated stream.
     public static Stream<Document> parse(final Path documentsRoot) throws IOException {
-        var financialTimes = parse(documentsRoot.resolve("ft").resolve("ft911"), new FinancialTimesParser());
+        var financialTimes = parse(documentsRoot.resolve("ft"), new FinancialTimesParser());
         var laTimes = parse(documentsRoot.resolve("latimes"), new LATimesParser());
         return Stream.concat(financialTimes, laTimes);
     }
