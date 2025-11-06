@@ -12,9 +12,14 @@ package org.cs7is3;
 // The GitHub Actions workflow will call:
 //   indexer.buildIndex(Path docsPath, Path indexPath)
 
+import org.cs7is3.parsing.DocumentsParser;
+
+import java.nio.file.Path;
+
 public class Indexer {
-    public void buildIndex(java.nio.file.Path docsPath, java.nio.file.Path indexPath) throws java.io.IOException {
-        // TODO: Implement your indexing logic
-        System.out.println("TODO: Implement your Lucene indexer");
+    public void buildIndex(final Path docsPath, final Path indexPath) throws java.io.IOException {
+        try (var documents = DocumentsParser.parse(docsPath)) {
+            documents.map(DocumentsParser.Document::toTruncatedString).forEach(System.out::println);
+        }
     }
 }
