@@ -2,6 +2,8 @@ package org.cs7is3.parsing;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -18,7 +20,8 @@ public class DocumentsParser {
     public static Stream<Document> parse(final Path documentsRoot) throws IOException {
         var financialTimes = parse(documentsRoot.resolve("ft"), new FinancialTimesParser());
         var laTimes = parse(documentsRoot.resolve("latimes"), new LATimesParser());
-        return Stream.concat(financialTimes, laTimes);
+        var foreignBroadcaster = parse(documentsRoot.resolve("fbis"), new ForeignBroadcastParser());
+        return Stream.concat(Stream.concat(financialTimes, laTimes), foreignBroadcaster);
     }
 
     // Recursively, lazily parses a directory. Each file in the directory must be parsed with the same parser.
@@ -29,7 +32,7 @@ public class DocumentsParser {
         });
         return files.flatMap(path -> {
             var documents = new ArrayList<Document>();
-            try (var lines = Files.lines(path)) {
+            try (var lines = Files.lines(path, parser.charset())) {
                 var current = new StringBuilder();
 
                 lines.forEach(line -> {
@@ -94,5 +97,9 @@ public class DocumentsParser {
         Document parse(final String rawContent);
 
         Set<String> ignoredFiles();
+
+        default Charset charset() {
+            return StandardCharsets.UTF_8;
+        }
     }
 }
