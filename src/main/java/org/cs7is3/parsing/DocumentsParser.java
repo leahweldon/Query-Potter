@@ -16,7 +16,8 @@ public class DocumentsParser {
     // returning a lazily evaluated stream.
     public static Stream<Document> parse(final Path documentsRoot) throws IOException {
         var financialTimes = parse(documentsRoot.resolve("ft").resolve("ft911"), new FinancialTimesParser());
-        return financialTimes;
+        var laTimes = parse(documentsRoot.resolve("latimes"), new LATimesParser());
+        return Stream.concat(financialTimes, laTimes);
     }
 
     // Recursively, lazily parses a directory. Each file in the directory must be parsed with the same parser.
