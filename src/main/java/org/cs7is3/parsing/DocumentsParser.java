@@ -1,6 +1,7 @@
 package org.cs7is3.parsing;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -55,10 +56,10 @@ public class DocumentsParser {
                     }
                 });
             } catch (IOException e) {
-                // We can't through checked exceptions from within a Stream::flatMap function, so we have to wrap this
-                // with a RuntimeException. In general this is unexpected anyway so it's probably not a bad idea to
+                // We can't throw checked exceptions from within a Stream::flatMap function, so we have to wrap this
+                // with a UncheckedIOException. In general this is unexpected anyway so it's probably not a bad idea to
                 // fail hard.
-                throw new RuntimeException(e);
+                throw new UncheckedIOException(e);
             }
 
             return documents.stream();
