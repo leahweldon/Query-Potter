@@ -21,7 +21,8 @@ public class DocumentsParser {
         var financialTimes = parse(documentsRoot.resolve("ft"), new FinancialTimesParser());
         var laTimes = parse(documentsRoot.resolve("latimes"), new LATimesParser());
         var foreignBroadcaster = parse(documentsRoot.resolve("fbis"), new ForeignBroadcastParser());
-        return Stream.concat(Stream.concat(financialTimes, laTimes), foreignBroadcaster);
+        var federalRegister = parse(documentsRoot.resolve("fr94"), new FederalRegisterParser());
+        return Stream.concat(Stream.concat(financialTimes, laTimes), Stream.concat(foreignBroadcaster, federalRegister));
     }
 
     // Recursively, lazily parses a directory. Each file in the directory must be parsed with the same parser.
