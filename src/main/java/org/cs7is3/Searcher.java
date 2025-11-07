@@ -13,9 +13,14 @@ package org.cs7is3;
 // The GitHub Actions workflow will call:
 //   searcher.searchTopics(Path indexPath, Path topicsPath, Path outputRun, int numDocs)
 
+import org.cs7is3.parsing.TopicsParser;
+
+import java.nio.file.Path;
+
 public class Searcher {
-    public void searchTopics(java.nio.file.Path indexPath, java.nio.file.Path topicsPath, 
-                           java.nio.file.Path outputRun, int numDocs) throws java.io.IOException {
+    public void searchTopics(Path indexPath, Path topicsPath, Path outputRun, int numDocs) throws java.io.IOException {
+        var topics = TopicsParser.parse(topicsPath);
+        topics.forEach(System.out::println);
         // TODO: Implement your search logic
         System.out.println("TODO: Implement your Lucene searcher");
     }
