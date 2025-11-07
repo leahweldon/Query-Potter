@@ -1,4 +1,8 @@
-package org.cs7is3;
+package org.cs7is3.parsing;
+
+import com.google.auto.value.AutoValue;
+import org.cs7is3.AnalyzerFactory;
+import org.cs7is3.SimilarityFactory;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -7,12 +11,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-class ArgsParser {
+public class ArgsParser {
     private static final ArgSpec<Path> INDEX_ARG = ArgSpec.required("--index", Paths::get);
-    private static final ArgSpec<App.AnalyzerMode> ANALYZER_ARG =
-            ArgSpec.optional("--analyzer", App.AnalyzerMode::valueOf, App.AnalyzerMode.ENGLISH);
-    private static final ArgSpec<App.SimilarityMode> SIMILARITY_ARG =
-            ArgSpec.optional("--similarity", App.SimilarityMode::valueOf, App.SimilarityMode.BM25);
+    private static final ArgSpec<AnalyzerFactory.AnalyzerMode> ANALYZER_ARG =
+            ArgSpec.optional("--analyzer", AnalyzerFactory.AnalyzerMode::valueOf, AnalyzerFactory.AnalyzerMode.ENGLISH);
+    private static final ArgSpec<SimilarityFactory.SimilarityMode> SIMILARITY_ARG =
+            ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, SimilarityFactory.SimilarityMode.BM25);
     private static final List<ArgSpec<?>> INDEX_ARGS = List.of(ArgSpec.required("--docs", Paths::get), INDEX_ARG);
     private static final List<ArgSpec<?>> SEARCH_ARGS = List.of(
             INDEX_ARG,
@@ -24,23 +28,24 @@ class ArgsParser {
     private ArgsParser() {
     }
 
-    static Args parse(String[] rawArgs) throws ArgsParsingException {
+    public static Args parse(String[] rawArgs) throws ArgsParsingException {
         if (rawArgs.length == 0) {
             throw new ArgsParsingException("Failed to parse arguments");
         }
 
-        var mode = Args.Mode.fromRaw(rawArgs[0]);
-        if (mode.equals(Args.Mode.HELP) || Arrays.stream(rawArgs).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
+        var mode = Mode.fromRaw(rawArgs[0]);
+        var builder = Args.newBuilder();
+        if (mode.equals(Mode.HELP) || Arrays.stream(rawArgs).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
             System.out.println(ArgsParsingException.USAGE);
             System.exit(0);
             // We have to have this return statement to satisfy the compiler. In reality the program will terminate so
             // this return value is useless.
-            return new Args(Args.Mode.HELP, null, null, null, null);
+            return builder.build();
         }
-        if (mode.equals(Args.Mode.INDEX)) {
+        if (mode.equals(Mode.INDEX)) {
             var args = parse(rawArgs, INDEX_ARGS);
             var index = new Args.Index(args.get("--docs", Path.class), args.get("--index", Path.class));
-            return new Args(mode, index, null, args.get("--analyzer", App.AnalyzerMode.class), args.get("--similarity", App.SimilarityMode.class));
+            return builder.setIndex(index).setAnalyzerMode(args).setSimilarityMode(args).build();
         }
 
         var args = parse(rawArgs, SEARCH_ARGS);
@@ -50,7 +55,7 @@ class ArgsParser {
                 /* output= */ args.get("--output", Path.class),
                 /* numDocs= */ args.get("--numDocs", Integer.class)
         );
-        return new Args(Args.Mode.SEARCH, null, search, args.get("--analyzer", App.AnalyzerMode.class), args.get("--similarity", App.SimilarityMode.class));
+        return builder.setSearch(search).setAnalyzerMode(args).setSimilarityMode(args).build();
     }
 
     private static ParsedArgs parse(String[] rawArgs, List<ArgSpec<?>> baseSpecs) throws ArgsParsingException {
@@ -126,31 +131,57 @@ class ArgsParser {
         }
     }
 
-    record Args(Mode mode, Index index, Search search, App.AnalyzerMode analyzer, App.SimilarityMode similarity) {
-        enum Mode {
-            INDEX, SEARCH, HELP;
+    @AutoValue
+    public static abstract class Args {
+        public record Index(Path docs, Path index) {
+        }
 
-            static Mode fromRaw(String raw) throws ArgsParsingException {
-                try {
-                    return Mode.valueOf(raw.toUpperCase(Locale.ROOT));
-                } catch (IllegalArgumentException e) {
-                    throw new ArgsParsingException(String.format("Unknown command '%s'", raw));
-                }
+        public record Search(Path index, Path topics, Path output, int numDocs) {
+        }
+
+        public abstract Optional<Index> index();
+
+        public abstract Optional<Search> search();
+
+        public abstract AnalyzerFactory.AnalyzerMode analyzerMode();
+
+        public abstract SimilarityFactory.SimilarityMode similarityMode();
+
+        @AutoValue.Builder
+        abstract static class Builder {
+            abstract Builder setIndex(Index index);
+
+            abstract Builder setSearch(Search search);
+
+            Builder setAnalyzerMode(ParsedArgs args) throws ArgsParsingException {
+                return setAnalyzerMode(args.get("--analyzer", AnalyzerFactory.AnalyzerMode.class));
             }
+
+            abstract Builder setAnalyzerMode(AnalyzerFactory.AnalyzerMode mode);
+
+            Builder setSimilarityMode(ParsedArgs args) throws ArgsParsingException {
+                return setSimilarityMode(args.get("--similarity", SimilarityFactory.SimilarityMode.class));
+            }
+
+            abstract Builder setSimilarityMode(SimilarityFactory.SimilarityMode mode);
+
+            abstract Args build();
         }
 
-        record Index(Path docs, Path index) {
+        static Builder newBuilder() {
+            return new AutoValue_ArgsParser_Args.Builder();
         }
+    }
 
-        record Search(Path index, Path topics, Path output, int numDocs) {
-        }
+    private enum Mode {
+        INDEX, SEARCH, HELP;
 
-        boolean hasIndex() {
-            return mode.equals(Mode.INDEX) && index != null;
-        }
-
-        boolean hasSearch() {
-            return mode.equals(Mode.SEARCH) && search != null;
+        static Mode fromRaw(String raw) throws ArgsParsingException {
+            try {
+                return Mode.valueOf(raw.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                throw new ArgsParsingException(String.format("Unknown command '%s'", raw));
+            }
         }
     }
 
