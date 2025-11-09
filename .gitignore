@@ -20,6 +20,8 @@ Thumbs.db
 index/
 runs/
 out/
+lucene-index/
+lucene-ndex/
 
 # Logs
 *.log

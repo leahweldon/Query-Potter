@@ -12,25 +12,39 @@ package org.cs7is3;
 // 3. Search command to produce a TREC-format run file with exactly 1000 results per topic
 // 4. Output format: "topic_id Q0 docno rank score run_tag"
 
+
 import org.cs7is3.parsing.ArgsParser;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class App {
     public static void main(String[] args) throws ArgsParser.ArgsParsingException, IOException {
         var parsedArgs = ArgsParser.parse(args);
+
         if (parsedArgs.index().isPresent()) {
+            var docsPath = parsedArgs.index().get().docs();
+            var indexPath = parsedArgs.index().get().index();
+
+            // Add defaults only if null, preserving existing logic
+            if (docsPath == null) {
+                docsPath = Paths.get("Assignment Two");
+            }
+            if (indexPath == null) {
+                indexPath = Paths.get("lucene-index");
+            }
+
             var indexer = new Indexer();
-            indexer.buildIndex(parsedArgs.index().get().docs(), parsedArgs.index().get().index());
+            indexer.buildIndex(docsPath, indexPath);
         } else if (parsedArgs.search().isPresent()) {
             var searcher = new Searcher();
             searcher.searchTopics(
-                    parsedArgs.search().get().index(),
-                    parsedArgs.search().get().topics(),
-                    parsedArgs.search().get().output(),
-                    parsedArgs.search().get().numDocs()
+                parsedArgs.search().get().index(),
+                parsedArgs.search().get().topics(),
+                parsedArgs.search().get().output(),
+                parsedArgs.search().get().numDocs()
             );
         }
     }
-
 }
