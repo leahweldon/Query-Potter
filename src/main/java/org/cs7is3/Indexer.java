@@ -23,12 +23,17 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 public class Indexer {
+    private final Analyzer analyzer;
+
+    Indexer(Analyzer analyzer) {
+        this.analyzer = analyzer;
+    }
+
     public void buildIndex(final Path docsPath, final Path indexPath) throws IOException {
         System.out.println("Starting indexing.");
         System.out.println("Documents path: " + docsPath.toAbsolutePath());
         System.out.println("Index path: " + indexPath.toAbsolutePath());
         
-        Analyzer analyzer = AnalyzerFactory.getInstance(AnalyzerFactory.AnalyzerMode.ENGLISH);
         Directory directory = FSDirectory.open(indexPath);
         IndexWriterConfig config = new IndexWriterConfig(analyzer);
 

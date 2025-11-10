@@ -13,11 +13,21 @@ package org.cs7is3;
 // The GitHub Actions workflow will call:
 //   searcher.searchTopics(Path indexPath, Path topicsPath, Path outputRun, int numDocs)
 
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.search.similarities.Similarity;
 import org.cs7is3.parsing.TopicsParser;
 
 import java.nio.file.Path;
 
 public class Searcher {
+    private final Analyzer analyzer;
+    private final Similarity similarity;
+
+    Searcher(Analyzer analyzer, Similarity similarity) {
+        this.analyzer = analyzer;
+        this.similarity = similarity;
+    }
+
     public void searchTopics(Path indexPath, Path topicsPath, Path outputRun, int numDocs) throws java.io.IOException {
         var topics = TopicsParser.parse(topicsPath);
         topics.forEach(System.out::println);

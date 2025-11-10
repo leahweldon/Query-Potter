@@ -16,13 +16,14 @@ package org.cs7is3;
 import org.cs7is3.parsing.ArgsParser;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class App {
     public static void main(String[] args) throws ArgsParser.ArgsParsingException, IOException {
         var parsedArgs = ArgsParser.parse(args);
 
+        var analyzer = AnalyzerFactory.getInstance(parsedArgs.analyzerMode());
+        var similarity = SimilarityFactory.getInstance(parsedArgs.similarityMode());
         if (parsedArgs.index().isPresent()) {
             var docsPath = parsedArgs.index().get().docs();
             var indexPath = parsedArgs.index().get().index();
@@ -35,10 +36,10 @@ public class App {
                 indexPath = Paths.get("lucene-index");
             }
 
-            var indexer = new Indexer();
+            var indexer = new Indexer(analyzer);
             indexer.buildIndex(docsPath, indexPath);
         } else if (parsedArgs.search().isPresent()) {
-            var searcher = new Searcher();
+            var searcher = new Searcher(analyzer, similarity);
             searcher.searchTopics(
                 parsedArgs.search().get().index(),
                 parsedArgs.search().get().topics(),
