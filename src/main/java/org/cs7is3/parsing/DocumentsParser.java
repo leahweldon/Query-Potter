@@ -37,7 +37,7 @@ public class DocumentsParser {
                 var current = new StringBuilder();
 
                 lines.forEach(line -> {
-                    if (line.isBlank()) {
+                    if (line.isBlank() || line.startsWith("<!--")) {
                         return;
                     }
                     if (line.trim().startsWith("<DOC>")) {
