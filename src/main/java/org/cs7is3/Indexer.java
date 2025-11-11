@@ -15,6 +15,7 @@ package org.cs7is3;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
+import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.cs7is3.parsing.DocumentsParser;
@@ -24,18 +25,22 @@ import java.nio.file.Path;
 
 public class Indexer {
     private final Analyzer analyzer;
+    private final Similarity similarity;
 
-    Indexer(Analyzer analyzer) {
+    Indexer(Analyzer analyzer, Similarity similarity) {
         this.analyzer = analyzer;
+        this.similarity = similarity;
     }
 
     public void buildIndex(final Path docsPath, final Path indexPath) throws IOException {
         System.out.println("Starting indexing.");
         System.out.println("Documents path: " + docsPath.toAbsolutePath());
         System.out.println("Index path: " + indexPath.toAbsolutePath());
-        
+
         Directory directory = FSDirectory.open(indexPath);
-        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        IndexWriterConfig config = new IndexWriterConfig(analyzer)
+                .setOpenMode(IndexWriterConfig.OpenMode.CREATE)
+                .setSimilarity(similarity);
 
         try (IndexWriter writer = new IndexWriter(directory, config);
              var documents = DocumentsParser.parse(docsPath)) {

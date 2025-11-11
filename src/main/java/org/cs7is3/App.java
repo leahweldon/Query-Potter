@@ -36,7 +36,7 @@ public class App {
                 indexPath = Paths.get("lucene-index");
             }
 
-            var indexer = new Indexer(analyzer);
+            var indexer = new Indexer(analyzer, similarity);
             indexer.buildIndex(docsPath, indexPath);
         } else if (parsedArgs.search().isPresent()) {
             var searcher = new Searcher(analyzer, similarity);
