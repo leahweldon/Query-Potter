@@ -111,7 +111,7 @@ public class Searcher {
         });
         return documentsToRanks.entrySet().stream().map(entry ->
                 new ScoreDoc(entry.getKey(), entry.getValue().floatValue())
-        ).limit(numDocs).toList();
+        ).sorted(ScoreDocComparator.INSTANCE).limit(numDocs).toList();
     }
 
     private static final class ScoreDocComparator implements Comparator<ScoreDoc> {
