@@ -75,7 +75,7 @@ public class Searcher {
                             var fields = searcher.storedFields().document(result.doc);
                             var score = result.score;
                             var docNo = fields.get("DOCNO");
-                            output.append(String.format("%s Q0 %s %d %.6f run-id\n", topic.number(), docNo, rank.incrementAndGet(), score));
+                            output.append(String.format("%s Q0 %s %d %.12f run-id\n", topic.number(), docNo, rank.incrementAndGet(), score));
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
