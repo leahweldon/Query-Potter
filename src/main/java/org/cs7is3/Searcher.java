@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Searcher {
     // Empirical value used for RRF, set to 60.0 per Cormack et. al (2009, DOI: 10.1145/1571941.1572114).
@@ -68,13 +69,13 @@ public class Searcher {
                     }).toList();
 
                     var rankedResults = reciprocalRankFusion(results, numDocs);
+                    var rank = new AtomicInteger(0);
                     rankedResults.forEach(result -> {
                         try {
                             var fields = searcher.storedFields().document(result.doc);
                             var score = result.score;
                             var docNo = fields.get("DOCNO");
-                            // TODO: rank is wrong!!!
-                            output.append(String.format("%s Q0 %s 1 %.6f run-id\n", topic.number(), docNo, score));
+                            output.append(String.format("%s Q0 %s %d %.6f run-id\n", topic.number(), docNo, rank.incrementAndGet(), score));
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
