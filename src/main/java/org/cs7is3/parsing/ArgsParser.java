@@ -2,6 +2,7 @@ package org.cs7is3.parsing;
 
 import com.google.auto.value.AutoValue;
 import org.cs7is3.AnalyzerFactory;
+import org.cs7is3.QueryGeneratorFactory;
 import org.cs7is3.SimilarityFactory;
 
 import java.nio.file.Path;
@@ -22,7 +23,8 @@ public class ArgsParser {
             INDEX_ARG,
             ArgSpec.required("--topics", Paths::get),
             ArgSpec.required("--output", Paths::get),
-            ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, 1_000)
+            ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, 1_000),
+            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, QueryGeneratorFactory.QueryMode.BOOSTED_TITLE)
     );
 
     private ArgsParser() {
@@ -53,7 +55,8 @@ public class ArgsParser {
                 /* index= */ args.get("--index", Path.class),
                 /* topics= */ args.get("--topics", Path.class),
                 /* output= */ args.get("--output", Path.class),
-                /* numDocs= */ args.get("--numDocs", Integer.class)
+                /* numDocs= */ args.get("--numDocs", Integer.class),
+                /* queryMode = */ args.get("--query", QueryGeneratorFactory.QueryMode.class)
         );
         return builder.setSearch(search).setAnalyzerMode(args).setSimilarityMode(args).build();
     }
@@ -118,6 +121,7 @@ public class ArgsParser {
                     --numDocs <int>             Maximum number of documents to retrieve per topic (default: 1000)
                     --analyzer <analyzer>       The analyzer to use. Should match the index analyzer (default: ENGLISH)
                     --similarity <similarity>   The similarity scorer to use. Should match the index similarity (default: BM25)
+                    --query <query>             The query generator to use (default: BOOSTED_TITLE)
                 
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar search --index index --topics topics --output runs/student.run --numDocs 1000
@@ -136,7 +140,8 @@ public class ArgsParser {
         public record Index(Path docs, Path index) {
         }
 
-        public record Search(Path index, Path topics, Path output, int numDocs) {
+        public record Search(Path index, Path topics, Path output, int numDocs,
+                             QueryGeneratorFactory.QueryMode queryMode) {
         }
 
         public abstract Optional<Index> index();

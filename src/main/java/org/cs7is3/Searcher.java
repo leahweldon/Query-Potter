@@ -42,10 +42,10 @@ public class Searcher {
     private final Similarity similarity;
     private final QueryGeneratorFactory.QueryGenerator queryGenerator;
 
-    Searcher(Analyzer analyzer, Similarity similarity) {
+    Searcher(Analyzer analyzer, Similarity similarity, QueryGeneratorFactory.QueryGenerator queryGenerator) {
         this.analyzer = analyzer;
         this.similarity = similarity;
-        this.queryGenerator = null; // TODO:
+        this.queryGenerator = queryGenerator;
     }
 
     public void searchTopics(Path indexPath, Path topicsPath, Path outputRun, int numDocs) throws IOException {

@@ -14,4 +14,22 @@ public class QueryGeneratorFactory {
     interface QueryGenerator {
         List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException;
     }
+
+    public enum QueryMode {
+        BOOSTED_TITLE
+    }
+
+    static QueryGenerator getInstance(QueryMode mode) {
+        return switch (mode) {
+            case BOOSTED_TITLE -> new BoostedTitleQueryGenerator();
+        };
+    }
+
+    private static final class BoostedTitleQueryGenerator implements QueryGenerator {
+        @Override
+        public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
+            // TODO:
+            return List.of();
+        }
+    }
 }

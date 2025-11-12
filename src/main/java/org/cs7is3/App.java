@@ -39,7 +39,8 @@ public class App {
             var indexer = new Indexer(analyzer, similarity);
             indexer.buildIndex(docsPath, indexPath);
         } else if (parsedArgs.search().isPresent()) {
-            var searcher = new Searcher(analyzer, similarity);
+            var queryGenerator = QueryGeneratorFactory.getInstance(parsedArgs.search().get().queryMode());
+            var searcher = new Searcher(analyzer, similarity, queryGenerator);
             searcher.searchTopics(
                 parsedArgs.search().get().index(),
                 parsedArgs.search().get().topics(),
