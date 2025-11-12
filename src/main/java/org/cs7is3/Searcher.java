@@ -40,7 +40,7 @@ public class Searcher {
 
     private final Analyzer analyzer;
     private final Similarity similarity;
-    private final QueryGenerator queryGenerator;
+    private final QueryGeneratorFactory.QueryGenerator queryGenerator;
 
     Searcher(Analyzer analyzer, Similarity similarity) {
         this.analyzer = analyzer;
