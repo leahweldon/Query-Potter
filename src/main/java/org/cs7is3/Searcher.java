@@ -120,6 +120,7 @@ public class Searcher {
         @Override
         public int compare(ScoreDoc a, ScoreDoc b) {
             // Copied from ScoreDoc.COMPARATOR in version 10.* of Lucene
+            // src: https://github.com/apache/lucene/blob/e02bdb4c3c547488342b423e1b9b2b25519bd427/lucene/core/src/java/org/apache/lucene/search/ScoreDoc.java#L57
             if (a.score > b.score) {
                 return -1;
             } else {
