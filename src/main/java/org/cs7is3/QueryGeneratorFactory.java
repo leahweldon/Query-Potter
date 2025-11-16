@@ -92,7 +92,7 @@ public class QueryGeneratorFactory {
     private static final class BoostedTitleQueryGenerator implements QueryGenerator {
         @Override
         public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
-            var parser = new MultiFieldQueryParser(ALL_FIELDS, analyzer);
+            var parser = new MultiFieldQueryParser(CORE_FIELDS, analyzer);
             var titleQuery = parseText(parser, topic.title());
             var descriptionQuery = parseText(parser, topic.description());
 
