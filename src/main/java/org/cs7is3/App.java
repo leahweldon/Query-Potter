@@ -23,7 +23,11 @@ public class App {
         var parsedArgs = ArgsParser.parse(args);
 
         var analyzer = AnalyzerFactory.getInstance(parsedArgs.analyzerMode());
-        var similarity = SimilarityFactory.getInstance(parsedArgs.similarityMode());
+        var similarity = SimilarityFactory.getInstance(
+                parsedArgs.similarityMode(),
+                parsedArgs.bm25k1(),
+                parsedArgs.bm25b()
+        );
         if (parsedArgs.index().isPresent()) {
             var docsPath = parsedArgs.index().get().docs();
             var indexPath = parsedArgs.index().get().index();

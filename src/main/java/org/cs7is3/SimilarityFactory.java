@@ -7,9 +7,9 @@ public class SimilarityFactory {
     private SimilarityFactory() {
     }
 
-    static Similarity getInstance(SimilarityMode mode) {
+    static Similarity getInstance(SimilarityMode mode, float bm25k1, float bm25b) {
         return switch (mode) {
-            case BM25 -> new BM25Similarity();
+            case BM25 -> new BM25Similarity(bm25k1, bm25b);
         };
     }
 
