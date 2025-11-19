@@ -14,18 +14,22 @@ import java.util.stream.Stream;
 
 public class ArgsParser {
     private static final ArgSpec<Path> INDEX_ARG = ArgSpec.required("--index", Paths::get);
+    private static final ArgSpec<Path> DOCS_ARG = ArgSpec.required("--docs", Paths::get);
+    private static final ArgSpec<Path> TOPICS_ARG = ArgSpec.required("--topics", Paths::get);
+    private static final ArgSpec<Integer> NUM_DOCS_ARG = ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, 1_000);
     private static final ArgSpec<AnalyzerFactory.AnalyzerMode> ANALYZER_ARG =
             ArgSpec.optional("--analyzer", AnalyzerFactory.AnalyzerMode::valueOf, AnalyzerFactory.AnalyzerMode.ENGLISH);
     private static final ArgSpec<SimilarityFactory.SimilarityMode> SIMILARITY_ARG =
             ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, SimilarityFactory.SimilarityMode.BM25);
-    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(ArgSpec.required("--docs", Paths::get), INDEX_ARG);
+    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(DOCS_ARG, INDEX_ARG);
     private static final List<ArgSpec<?>> SEARCH_ARGS = List.of(
             INDEX_ARG,
-            ArgSpec.required("--topics", Paths::get),
+            TOPICS_ARG,
             ArgSpec.required("--output", Paths::get),
-            ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, 1_000),
+            NUM_DOCS_ARG,
             ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, QueryGeneratorFactory.QueryMode.BOOSTED_TITLE)
     );
+    private static final List<ArgSpec<?>> EVALUATE_ARGS = List.of(DOCS_ARG, TOPICS_ARG, ArgSpec.required("--qrels", Paths::get), NUM_DOCS_ARG);
 
     private ArgsParser() {
     }
@@ -43,6 +47,16 @@ public class ArgsParser {
             // We have to have this return statement to satisfy the compiler. In reality the program will terminate so
             // this return value is useless.
             return builder.build();
+        }
+        if (mode.equals(Mode.EVALUATE)) {
+            var args = parse(rawArgs, EVALUATE_ARGS);
+            var evaluate = new Args.Evaluate(
+                    args.get("--docs", Path.class),
+                    args.get("--topics", Path.class),
+                    args.get("--qrels", Path.class),
+                    args.get("--numDocs", Integer.class)
+            );
+            return builder.setEvaluate(evaluate).build();
         }
         if (mode.equals(Mode.INDEX)) {
             var args = parse(rawArgs, INDEX_ARGS);
@@ -104,6 +118,7 @@ public class ArgsParser {
                     index    Build an index from a set of documents
                     search   Run a search using the provided topics
                     help     Print this message and exit
+                    evaluate Evaluates all permutations of queries, analyzers and similarity scoring methods
                 
                 Options for `index`:
                     --docs <path>               Path to the directory containing the documents
@@ -126,6 +141,15 @@ public class ArgsParser {
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar search --index index --topics topics --output runs/student.run --numDocs 1000
                 
+                Options for `evaluate`:
+                    --docs <path>       Path to the directory containing the documents
+                    --topics <path>     Path to the topics file to generate queries from
+                    --qrels <path>      Path to the relevance judgements file to use in evaluation
+                    --numDocs <int>     Maximum number of documents to retrieve per topic (default: 1000)
+                
+                Example:
+                    java -jar target/cs7is3-search-1.0.0.jar evaluate --docs "Assignment Two" --topics topics --qrels qrels --numDocs 1000
+                
                 General options:
                     -h, --help  Display this message and exit
                 """;
@@ -144,19 +168,30 @@ public class ArgsParser {
                              QueryGeneratorFactory.QueryMode queryMode) {
         }
 
+        public record Evaluate(Path docs, Path topics, Path qrelsFile, int numDocs) {
+        }
+
         public abstract Optional<Index> index();
 
         public abstract Optional<Search> search();
 
-        public abstract AnalyzerFactory.AnalyzerMode analyzerMode();
+        public abstract Optional<Evaluate> evaluate();
 
-        public abstract SimilarityFactory.SimilarityMode similarityMode();
+        public abstract Optional<AnalyzerFactory.AnalyzerMode> analyzerMode();
+
+        public abstract Optional<SimilarityFactory.SimilarityMode> similarityMode();
+
+        public boolean isEvaluateMode() {
+            return index().isEmpty() && search().isEmpty() && evaluate().isPresent();
+        }
 
         @AutoValue.Builder
         abstract static class Builder {
             abstract Builder setIndex(Index index);
 
             abstract Builder setSearch(Search search);
+
+            abstract Builder setEvaluate(Evaluate evaluate);
 
             Builder setAnalyzerMode(ParsedArgs args) throws ArgsParsingException {
                 return setAnalyzerMode(args.get("--analyzer", AnalyzerFactory.AnalyzerMode.class));
@@ -170,7 +205,27 @@ public class ArgsParser {
 
             abstract Builder setSimilarityMode(SimilarityFactory.SimilarityMode mode);
 
-            abstract Args build();
+            Args build() throws ArgsParsingException {
+                var result = autoBuild();
+                if (result.isEvaluateMode()) {
+                    return result;
+                }
+
+                var missing = new StringBuilder();
+                if (result.analyzerMode().isEmpty()) {
+                    missing.append(" --analyzer");
+                }
+                if (result.similarityMode().isEmpty()) {
+                    missing.append(" --similarity");
+                }
+                if (missing.isEmpty()) {
+                    return result;
+                }
+
+                throw new ArgsParsingException("Missing parameters: " + missing);
+            }
+
+            protected abstract Args autoBuild();
         }
 
         static Builder newBuilder() {
@@ -179,7 +234,7 @@ public class ArgsParser {
     }
 
     private enum Mode {
-        INDEX, SEARCH, HELP;
+        INDEX, SEARCH, HELP, EVALUATE;
 
         static Mode fromRaw(String raw) throws ArgsParsingException {
             try {

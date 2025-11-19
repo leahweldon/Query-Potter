@@ -19,11 +19,16 @@ import java.io.IOException;
 import java.nio.file.Paths;
 
 public class App {
-    public static void main(String[] args) throws ArgsParser.ArgsParsingException, IOException {
+    public static void main(String[] args) throws ArgsParser.ArgsParsingException, IOException, InterruptedException {
         var parsedArgs = ArgsParser.parse(args);
 
-        var analyzer = AnalyzerFactory.getInstance(parsedArgs.analyzerMode());
-        var similarity = SimilarityFactory.getInstance(parsedArgs.similarityMode());
+        if (parsedArgs.isEvaluateMode()) {
+            Evaluator.evaluate(parsedArgs.evaluate().get());
+            return;
+        }
+
+        var analyzer = AnalyzerFactory.getInstance(parsedArgs.analyzerMode().get());
+        var similarity = SimilarityFactory.getInstance(parsedArgs.similarityMode().get());
         if (parsedArgs.index().isPresent()) {
             var docsPath = parsedArgs.index().get().docs();
             var indexPath = parsedArgs.index().get().index();
