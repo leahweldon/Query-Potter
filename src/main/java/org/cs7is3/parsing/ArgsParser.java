@@ -32,7 +32,7 @@ public class ArgsParser {
             TOPICS_ARG,
             ArgSpec.required("--output", Paths::get),
             NUM_DOCS_ARG,
-            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, QueryGeneratorFactory.QueryMode.BOOSTED_TITLE)
+            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, QueryGeneratorFactory.QueryMode.TITLE_DESC_NARRATIVE_CLEANED)
     );
     private static final List<ArgSpec<?>> EVALUATE_ARGS = List.of(DOCS_ARG, TOPICS_ARG, ArgSpec.required("--qrels", Paths::get), NUM_DOCS_ARG);
 
@@ -264,7 +264,7 @@ public class ArgsParser {
         }
 
         static Builder newBuilder() {
-            return new AutoValue_ArgsParser_Args.Builder();
+            return new AutoValue_ArgsParser_Args.Builder().setBm25k1(1.2f).setBm25b(0.75f);
         }
     }
 
