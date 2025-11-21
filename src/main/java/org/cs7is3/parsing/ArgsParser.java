@@ -20,7 +20,7 @@ public class ArgsParser {
     private static final ArgSpec<AnalyzerFactory.AnalyzerMode> ANALYZER_ARG =
             ArgSpec.optional("--analyzer", AnalyzerFactory.AnalyzerMode::valueOf, AnalyzerFactory.AnalyzerMode.ENGLISH);
     private static final ArgSpec<SimilarityFactory.SimilarityMode> SIMILARITY_ARG =
-            ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, SimilarityFactory.SimilarityMode.BM25);
+            ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, SimilarityFactory.SimilarityMode.DIRICHLET_BASE);
     private static final List<ArgSpec<?>> INDEX_ARGS = List.of(DOCS_ARG, INDEX_ARG);
     private static final List<ArgSpec<?>> SEARCH_ARGS = List.of(
             INDEX_ARG,
