@@ -41,11 +41,14 @@ public class Searcher {
     private final Analyzer analyzer;
     private final Similarity similarity;
     private final QueryGeneratorFactory.QueryGenerator queryGenerator;
+    private final String runTag;
 
-    Searcher(Analyzer analyzer, Similarity similarity, QueryGeneratorFactory.QueryGenerator queryGenerator) {
+    Searcher(Analyzer analyzer, Similarity similarity, QueryGeneratorFactory.QueryGenerator queryGenerator,
+             String runTag) {
         this.analyzer = analyzer;
         this.similarity = similarity;
         this.queryGenerator = queryGenerator;
+        this.runTag = runTag;
     }
 
     public void searchTopics(Path indexPath, Path topicsPath, Path outputRun, int numDocs) throws IOException {
@@ -75,7 +78,7 @@ public class Searcher {
                             var fields = searcher.storedFields().document(result.doc);
                             var score = result.score;
                             var docNo = fields.get("DOCNO");
-                            output.append(String.format("%s Q0 %s %d %.12f run-id\n", topic.number(), docNo, rank.incrementAndGet(), score));
+                            output.append(String.format("%s Q0 %s %d %.12f %s\n", topic.number(), docNo, rank.incrementAndGet(), score, runTag));
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }

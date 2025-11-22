@@ -20,8 +20,15 @@ public class ArgsParser {
     private static final ArgSpec<AnalyzerFactory.AnalyzerMode> ANALYZER_ARG =
             ArgSpec.optional("--analyzer", AnalyzerFactory.AnalyzerMode::valueOf, AnalyzerFactory.AnalyzerMode.ENGLISH);
     private static final ArgSpec<SimilarityFactory.SimilarityMode> SIMILARITY_ARG =
-            ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, SimilarityFactory.SimilarityMode.DIRICHLET_BASE);
-    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(DOCS_ARG, INDEX_ARG);
+            ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, SimilarityFactory.SimilarityMode.BM25);
+
+            // Optional BM25 parameters so we can tweak k1 and b from the command line.
+    private static final ArgSpec<Float> BM25_K1_ARG =
+            ArgSpec.optional("--bm25k1", Float::parseFloat, 1.2f);
+    private static final ArgSpec<Float> BM25_B_ARG =
+            ArgSpec.optional("--bm25b", Float::parseFloat, 0.75f);
+            
+    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(ArgSpec.required("--docs", Paths::get), INDEX_ARG);
     private static final List<ArgSpec<?>> SEARCH_ARGS = List.of(
             INDEX_ARG,
             TOPICS_ARG,
@@ -61,7 +68,12 @@ public class ArgsParser {
         if (mode.equals(Mode.INDEX)) {
             var args = parse(rawArgs, INDEX_ARGS);
             var index = new Args.Index(args.get("--docs", Path.class), args.get("--index", Path.class));
-            return builder.setIndex(index).setAnalyzerMode(args).setSimilarityMode(args).build();
+            return builder
+                    .setIndex(index)
+                    .setAnalyzerMode(args)
+                    .setSimilarityMode(args)
+                    .setBm25Params(args)
+                    .build();
         }
 
         var args = parse(rawArgs, SEARCH_ARGS);
@@ -72,13 +84,21 @@ public class ArgsParser {
                 /* numDocs= */ args.get("--numDocs", Integer.class),
                 /* queryMode = */ args.get("--query", QueryGeneratorFactory.QueryMode.class)
         );
-        return builder.setSearch(search).setAnalyzerMode(args).setSimilarityMode(args).build();
+        return builder
+                .setSearch(search)
+                .setAnalyzerMode(args)
+                .setSimilarityMode(args)
+                .setBm25Params(args)
+                .build();
     }
 
     private static ParsedArgs parse(String[] rawArgs, List<ArgSpec<?>> baseSpecs) throws ArgsParsingException {
         var parsed = new HashMap<String, Object>(baseSpecs.size());
-        var specs = Stream.concat(baseSpecs.stream(), Stream.of(ANALYZER_ARG, SIMILARITY_ARG))
-                .collect(Collectors.toUnmodifiableSet());
+                var specs = Stream.concat(
+                        baseSpecs.stream(),
+                        Stream.of(ANALYZER_ARG, SIMILARITY_ARG, BM25_K1_ARG, BM25_B_ARG)
+                ).collect(Collectors.toUnmodifiableSet());
+
         var namedSpecs = specs.stream().collect(Collectors.toMap(ArgSpec::name, Function.identity()));
 
         for (var i = 1; i < rawArgs.length; i++) {
@@ -125,6 +145,8 @@ public class ArgsParser {
                     --index <path>              Path to where the index will be stored
                     --analyzer <analyzer>       The analyzer to use. Should match the index analyzer (default: ENGLISH)
                     --similarity <similarity>   The similarity scorer to use. Should match the index similarity (default: BM25)
+                    --bm25k1 <float>            k1 parameter for BM25 (default: 1.2)
+                    --bm25b <float>             b parameter for BM25 (default: 0.75)
                 
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar index --docs "Assignment Two" --index index
@@ -137,6 +159,8 @@ public class ArgsParser {
                     --analyzer <analyzer>       The analyzer to use. Should match the index analyzer (default: ENGLISH)
                     --similarity <similarity>   The similarity scorer to use. Should match the index similarity (default: BM25)
                     --query <query>             The query generator to use (default: BOOSTED_TITLE)
+                    --bm25k1 <float>            k1 parameter for BM25 (default: 1.2)
+                    --bm25b <float>             b parameter for BM25 (default: 0.75)
                 
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar search --index index --topics topics --output runs/student.run --numDocs 1000
@@ -181,6 +205,10 @@ public class ArgsParser {
 
         public abstract Optional<SimilarityFactory.SimilarityMode> similarityMode();
 
+        // BM25 parameters extracted from command-line if provided
+        public abstract float bm25k1();
+        public abstract float bm25b();
+
         public boolean isEvaluateMode() {
             return index().isEmpty() && search().isEmpty() && evaluate().isPresent();
         }
@@ -204,6 +232,15 @@ public class ArgsParser {
             }
 
             abstract Builder setSimilarityMode(SimilarityFactory.SimilarityMode mode);
+
+            Builder setBm25Params(ParsedArgs args) throws ArgsParsingException {
+                return setBm25k1(args.get("--bm25k1", Float.class))
+                        .setBm25b(args.get("--bm25b", Float.class));
+            }
+
+            abstract Builder setBm25k1(float k1);
+
+            abstract Builder setBm25b(float b);
 
             Args build() throws ArgsParsingException {
                 var result = autoBuild();

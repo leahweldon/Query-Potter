@@ -15,7 +15,15 @@ public class SimilarityFactory {
         };
     }
 
+    static Similarity getInstance(SimilarityMode mode, float bm25k1, float bm25b) {
+        return switch (mode) {
+            case BM25 -> new BM25Similarity(bm25k1, bm25b);
+            case DIRICHLET_BASE -> new LMDirichletSimilarity();
+        };
+    }
+
     public enum SimilarityMode {
-        BM25, DIRICHLET_BASE
+        BM25,
+        DIRICHLET_BASE
     }
 }
