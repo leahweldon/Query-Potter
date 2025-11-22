@@ -44,7 +44,7 @@ public class App {
             indexer.buildIndex(docsPath, indexPath);
         } else if (parsedArgs.search().isPresent()) {
             var searchArgs = parsedArgs.search().get();
-            var queryGenerator = QueryGeneratorFactory.getInstance(searchArgs.queryMode());
+            var queryGenerator = QueryGeneratorFactory.getInstance(searchArgs.queryMode(), searchArgs.queryParserMode());
             // Added a Run Tag
             // Example: bm25_k1_1.20_b_0.75_MULTI_QUERY_RRF
             var runTag = String.format(

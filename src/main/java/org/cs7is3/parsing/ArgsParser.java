@@ -34,7 +34,8 @@ public class ArgsParser {
             TOPICS_ARG,
             ArgSpec.required("--output", Paths::get),
             NUM_DOCS_ARG,
-            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, Defaults.QUERY_MODE)
+            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, Defaults.QUERY_MODE),
+            ArgSpec.optional("--query-parser", QueryGeneratorFactory.QueryParserMode::valueOf, Defaults.QUERY_PARSER)
     );
     private static final List<ArgSpec<?>> EVALUATE_ARGS = List.of(DOCS_ARG, TOPICS_ARG, ArgSpec.required("--qrels", Paths::get), NUM_DOCS_ARG);
 
@@ -82,7 +83,8 @@ public class ArgsParser {
                 /* topics= */ args.get("--topics", Path.class),
                 /* output= */ args.get("--output", Path.class),
                 /* numDocs= */ args.get("--numDocs", Integer.class),
-                /* queryMode = */ args.get("--query", QueryGeneratorFactory.QueryMode.class)
+                /* queryMode = */ args.get("--query", QueryGeneratorFactory.QueryMode.class),
+                /* queryParserMode = */ args.get("--query-parser", QueryGeneratorFactory.QueryParserMode.class)
         );
         return builder
                 .setSearch(search)
@@ -94,10 +96,10 @@ public class ArgsParser {
 
     private static ParsedArgs parse(String[] rawArgs, List<ArgSpec<?>> baseSpecs) throws ArgsParsingException {
         var parsed = new HashMap<String, Object>(baseSpecs.size());
-                var specs = Stream.concat(
-                        baseSpecs.stream(),
-                        Stream.of(ANALYZER_ARG, SIMILARITY_ARG, BM25_K1_ARG, BM25_B_ARG)
-                ).collect(Collectors.toUnmodifiableSet());
+        var specs = Stream.concat(
+                baseSpecs.stream(),
+                Stream.of(ANALYZER_ARG, SIMILARITY_ARG, BM25_K1_ARG, BM25_B_ARG)
+        ).collect(Collectors.toUnmodifiableSet());
 
         var namedSpecs = specs.stream().collect(Collectors.toMap(ArgSpec::name, Function.identity()));
 
@@ -159,6 +161,7 @@ public class ArgsParser {
                     --analyzer <analyzer>       The analyzer to use. Should match the index analyzer (default: ENGLISH)
                     --similarity <similarity>   The similarity scorer to use. Should match the index similarity (default: BM25)
                     --query <query>             The query generator to use (default: BOOSTED_TITLE)
+                    --query-parser <parser>     The query parser to use (default: UNIFORM_MULTI_FIELDS)
                     --bm25k1 <float>            k1 parameter for BM25 (default: 1.2)
                     --bm25b <float>             b parameter for BM25 (default: 0.75)
                 
@@ -189,7 +192,7 @@ public class ArgsParser {
         }
 
         public record Search(Path index, Path topics, Path output, int numDocs,
-                             QueryGeneratorFactory.QueryMode queryMode) {
+                             QueryGeneratorFactory.QueryMode queryMode, QueryGeneratorFactory.QueryParserMode queryParserMode) {
         }
 
         public record Evaluate(Path docs, Path topics, Path qrelsFile, int numDocs) {

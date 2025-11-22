@@ -3,6 +3,7 @@ package org.cs7is3;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
@@ -12,6 +13,7 @@ import org.cs7is3.parsing.TopicsParser;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class QueryGeneratorFactory {
     // A QueryGeneratorFactory constructs queries for a given topic. These queries are then run against the index and
@@ -29,21 +31,23 @@ public class QueryGeneratorFactory {
         MULTI_QUERY_RRF                   // multiple complementary queries fused via RRF
     }
 
-    static QueryGenerator getInstance(QueryMode mode) {
-        return switch (mode) {
+    public enum QueryParserMode {
+        UNIFORM_MULTI_FIELDS,
+        WEAK_TITLE_STRONG_CONTENT;
+    }
+
+    static QueryGenerator getInstance(QueryMode mode, QueryParserMode queryParserMode) {
+        var generator = switch (mode) {
             case BOOSTED_TITLE -> new BoostedTitleQueryGenerator();
             case TITLE_ONLY -> new TitleOnlyQueryGenerator();
             case TITLE_DESC -> new TitleDescQueryGenerator();
             case TITLE_DESC_NARRATIVE_CLEANED -> new TitleDescNarrativeCleanedQueryGenerator();
             case MULTI_QUERY_RRF -> new MultiQueryRrfGenerator();
         };
+        return generator.withParser(queryParserMode);
     }
 
-    // We mainly care about title and body text for content matching. Author/date can carry weaker signal.
-    private static final String[] CORE_FIELDS = {"TITLE", "BODY"};
-    private static final String[] ALL_FIELDS = {"TITLE", "AUTHOR", "BODY", "DATE"};
-
-     // Basic normalisation for topic text: collapse whitespace and trim.
+    // Basic normalisation for topic text: collapse whitespace and trim.
     private static String normalise(String text) {
         if (text == null) {
             return "";
@@ -80,7 +84,7 @@ public class QueryGeneratorFactory {
     }
 
     // Helper to parse some text using a MultiFieldQueryParser after normalisation and escaping.
-    private static Query parseText(MultiFieldQueryParser parser, String text) throws ParseException {
+    private static Query parseText(QueryParser parser, String text) throws ParseException {
         var normalised = normalise(text);
         if (normalised.isEmpty()) {
             // Returns an empty BooleanQuery if there is nothing to parse.
@@ -89,10 +93,28 @@ public class QueryGeneratorFactory {
         return parser.parse(QueryParserBase.escape(normalised));
     }
 
-    private static final class BoostedTitleQueryGenerator implements QueryGenerator {
+    private static abstract class ConfigurableQueryGenerator implements QueryGenerator {
+        private QueryParserMode queryParserMode;
+
+        ConfigurableQueryGenerator withParser(QueryParserMode queryParserMode) {
+            this.queryParserMode = queryParserMode;
+            return this;
+        }
+
+        protected QueryParser queryParser(Analyzer analyzer) {
+            var coreFields = new String[]{"TITLE", "BODY"};
+            return switch (queryParserMode) {
+                case UNIFORM_MULTI_FIELDS -> new MultiFieldQueryParser(coreFields, analyzer);
+                case WEAK_TITLE_STRONG_CONTENT ->
+                        new MultiFieldQueryParser(coreFields, analyzer, Map.of("TITLE", 0.08f, "BODY", 0.92f));
+            };
+        }
+    }
+
+    private static final class BoostedTitleQueryGenerator extends ConfigurableQueryGenerator {
         @Override
         public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
-            var parser = new MultiFieldQueryParser(CORE_FIELDS, analyzer);
+            var parser = queryParser(analyzer);
             var titleQuery = parseText(parser, topic.title());
             var descriptionQuery = parseText(parser, topic.description());
 
@@ -106,10 +128,10 @@ public class QueryGeneratorFactory {
     }
 
     // Title-only queries
-    private static final class TitleOnlyQueryGenerator implements QueryGenerator {
+    private static final class TitleOnlyQueryGenerator extends ConfigurableQueryGenerator {
         @Override
         public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
-            var parser = new MultiFieldQueryParser(CORE_FIELDS, analyzer);
+            var parser = queryParser(analyzer);
             var titleQuery = parseText(parser, topic.title());
             var boosted = new BoostQuery(titleQuery, 2.0f);
             return List.of(boosted);
@@ -117,10 +139,10 @@ public class QueryGeneratorFactory {
     }
 
     // Title + description
-    private static final class TitleDescQueryGenerator implements QueryGenerator {
+    private static final class TitleDescQueryGenerator extends ConfigurableQueryGenerator {
         @Override
         public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
-            var parser = new MultiFieldQueryParser(CORE_FIELDS, analyzer);
+            var parser = queryParser(analyzer);
             var titleQuery = parseText(parser, topic.title());
             var descQuery = parseText(parser, topic.description());
 
@@ -133,10 +155,10 @@ public class QueryGeneratorFactory {
     }
 
     // Title + description + cleaned narrative
-    private static final class TitleDescNarrativeCleanedQueryGenerator implements QueryGenerator {
+    private static final class TitleDescNarrativeCleanedQueryGenerator extends ConfigurableQueryGenerator {
         @Override
         public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
-            var parser = new MultiFieldQueryParser(CORE_FIELDS, analyzer);
+            var parser = queryParser(analyzer);
             var titleQuery = parseText(parser, topic.title());
             var descQuery = parseText(parser, topic.description());
             var cleanedNarrative = cleanNarrative(topic.narrative());
@@ -155,11 +177,11 @@ public class QueryGeneratorFactory {
     // Q1: title-only (strong boost)
     // Q2: title + description
     // Q3: cleaned narrative only (smaller boost)
-    private static final class MultiQueryRrfGenerator implements QueryGenerator {
+    private static final class MultiQueryRrfGenerator extends ConfigurableQueryGenerator {
         @Override
         public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
             var queries = new ArrayList<Query>();
-            var parser = new MultiFieldQueryParser(CORE_FIELDS, analyzer);
+            var parser = queryParser(analyzer);
 
             // Q1: title-only
             var titleQuery = parseText(parser, topic.title());

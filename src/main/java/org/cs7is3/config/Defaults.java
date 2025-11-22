@@ -9,6 +9,7 @@ public class Defaults {
     public static final AnalyzerFactory.AnalyzerMode ANALYZER_MODE = AnalyzerFactory.AnalyzerMode.ENGLISH;
     public static final SimilarityFactory.SimilarityMode SIMILARITY_MODE = SimilarityFactory.SimilarityMode.DIRICHLET;
     public static final QueryGeneratorFactory.QueryMode QUERY_MODE = QueryGeneratorFactory.QueryMode.TITLE_DESC_NARRATIVE_CLEANED;
+    public static final QueryGeneratorFactory.QueryParserMode QUERY_PARSER = QueryGeneratorFactory.QueryParserMode.UNIFORM_MULTI_FIELDS;
     public static final float BM25_K1 = 1.2f;
     public static final float BM25_B = 0.75f;
     public static final float DIRICHLET_MU = 2000.0f;
