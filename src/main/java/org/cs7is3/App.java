@@ -28,7 +28,11 @@ public class App {
         }
 
         var analyzer = AnalyzerFactory.getInstance(parsedArgs.analyzerMode().get());
-        var similarity = SimilarityFactory.getInstance(parsedArgs.similarityMode().get());
+        var similarity = SimilarityFactory.getInstance(
+                parsedArgs.similarityMode().get(),
+                parsedArgs.bm25k1(),
+                parsedArgs.bm25b()
+        );
         if (parsedArgs.index().isPresent()) {
             var docsPath = parsedArgs.index().get().docs();
             var indexPath = parsedArgs.index().get().index();
@@ -44,13 +48,23 @@ public class App {
             var indexer = new Indexer(analyzer, similarity);
             indexer.buildIndex(docsPath, indexPath);
         } else if (parsedArgs.search().isPresent()) {
-            var queryGenerator = QueryGeneratorFactory.getInstance(parsedArgs.search().get().queryMode());
-            var searcher = new Searcher(analyzer, similarity, queryGenerator);
+            var searchArgs = parsedArgs.search().get();
+            var queryGenerator = QueryGeneratorFactory.getInstance(searchArgs.queryMode());
+            // Added a Run Tag
+            // Example: bm25_k1_1.20_b_0.75_MULTI_QUERY_RRF
+            var runTag = String.format(
+                    "bm25_k1_%.2f_b_%.2f_%s",
+                    parsedArgs.bm25k1(),
+                    parsedArgs.bm25b(),
+                    searchArgs.queryMode().name()
+            );
+
+            var searcher = new Searcher(analyzer, similarity, queryGenerator, runTag);
             searcher.searchTopics(
-                parsedArgs.search().get().index(),
-                parsedArgs.search().get().topics(),
-                parsedArgs.search().get().output(),
-                parsedArgs.search().get().numDocs()
+                    searchArgs.index(),
+                    searchArgs.topics(),
+                    searchArgs.output(),
+                    searchArgs.numDocs()
             );
         }
     }

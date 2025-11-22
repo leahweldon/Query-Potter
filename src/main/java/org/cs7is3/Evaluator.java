@@ -23,7 +23,8 @@ public class Evaluator {
             var analyzer = AnalyzerFactory.getInstance(analyzerMode);
 
             for (var similarityMode : SimilarityFactory.SimilarityMode.values()) {
-                var similarity = SimilarityFactory.getInstance(similarityMode);
+                // TODO: this is currently hardcoded, probably want a way to vary this for evaluation purposes as well.
+                var similarity = SimilarityFactory.getInstance(similarityMode, 1.2f, 0.75f);
 
                 var indexer = new Indexer(analyzer, similarity);
                 var indexPath = Paths.get("matrix", String.format("%s-%s", analyzerMode, similarityMode));
@@ -33,7 +34,7 @@ public class Evaluator {
                 for (var queryMode : QueryGeneratorFactory.QueryMode.values()) {
                     var fileName = String.format("%s-%s-%s", analyzerMode, similarityMode, queryMode);
                     var queryGenerator = QueryGeneratorFactory.getInstance(queryMode);
-                    var searcher = new Searcher(analyzer, similarity, queryGenerator);
+                    var searcher = new Searcher(analyzer, similarity, queryGenerator, fileName);
                     var outputFile = Files.createTempFile(outputDirectory, fileName, ".run");
                     searcher.searchTopics(indexPath, args.topics(), outputFile, args.numDocs());
 
