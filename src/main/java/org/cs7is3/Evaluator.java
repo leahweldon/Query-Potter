@@ -1,5 +1,7 @@
 package org.cs7is3;
 
+import org.cs7is3.config.Config;
+import org.cs7is3.config.Defaults;
 import org.cs7is3.parsing.ArgsParser;
 
 import java.io.IOException;
@@ -24,7 +26,7 @@ public class Evaluator {
 
             for (var similarityMode : SimilarityFactory.SimilarityMode.values()) {
                 // TODO: this is currently hardcoded, probably want a way to vary this for evaluation purposes as well.
-                var similarity = SimilarityFactory.getInstance(similarityMode, 1.2f, 0.75f);
+                var similarity = SimilarityFactory.getInstance(similarityMode, Config.newBuilder().build());
 
                 var indexer = new Indexer(analyzer, similarity);
                 var indexPath = Paths.get("matrix", String.format("%s-%s", analyzerMode, similarityMode));

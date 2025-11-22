@@ -12,7 +12,6 @@ package org.cs7is3;
 // 3. Search command to produce a TREC-format run file with exactly 1000 results per topic
 // 4. Output format: "topic_id Q0 docno rank score run_tag"
 
-
 import org.cs7is3.parsing.ArgsParser;
 
 import java.io.IOException;
@@ -28,11 +27,7 @@ public class App {
         }
 
         var analyzer = AnalyzerFactory.getInstance(parsedArgs.analyzerMode().get());
-        var similarity = SimilarityFactory.getInstance(
-                parsedArgs.similarityMode().get(),
-                parsedArgs.bm25k1(),
-                parsedArgs.bm25b()
-        );
+        var similarity = SimilarityFactory.getInstance(parsedArgs.similarityMode().get(), parsedArgs.config());
         if (parsedArgs.index().isPresent()) {
             var docsPath = parsedArgs.index().get().docs();
             var indexPath = parsedArgs.index().get().index();
@@ -54,8 +49,8 @@ public class App {
             // Example: bm25_k1_1.20_b_0.75_MULTI_QUERY_RRF
             var runTag = String.format(
                     "bm25_k1_%.2f_b_%.2f_%s",
-                    parsedArgs.bm25k1(),
-                    parsedArgs.bm25b(),
+                    parsedArgs.config().bm25().k1(),
+                    parsedArgs.config().bm25().b(),
                     searchArgs.queryMode().name()
             );
 

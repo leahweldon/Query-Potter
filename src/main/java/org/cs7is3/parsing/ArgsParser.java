@@ -4,6 +4,8 @@ import com.google.auto.value.AutoValue;
 import org.cs7is3.AnalyzerFactory;
 import org.cs7is3.QueryGeneratorFactory;
 import org.cs7is3.SimilarityFactory;
+import org.cs7is3.config.Config;
+import org.cs7is3.config.Defaults;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,23 +18,23 @@ public class ArgsParser {
     private static final ArgSpec<Path> INDEX_ARG = ArgSpec.required("--index", Paths::get);
     private static final ArgSpec<Path> DOCS_ARG = ArgSpec.required("--docs", Paths::get);
     private static final ArgSpec<Path> TOPICS_ARG = ArgSpec.required("--topics", Paths::get);
-    private static final ArgSpec<Integer> NUM_DOCS_ARG = ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, 1_000);
+    private static final ArgSpec<Integer> NUM_DOCS_ARG = ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, Defaults.NUMBER_OF_DOCUMENTS);
     private static final ArgSpec<AnalyzerFactory.AnalyzerMode> ANALYZER_ARG =
-            ArgSpec.optional("--analyzer", AnalyzerFactory.AnalyzerMode::valueOf, AnalyzerFactory.AnalyzerMode.ENGLISH);
+            ArgSpec.optional("--analyzer", AnalyzerFactory.AnalyzerMode::valueOf, Defaults.ANALYZER_MODE);
     private static final ArgSpec<SimilarityFactory.SimilarityMode> SIMILARITY_ARG =
-            ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, SimilarityFactory.SimilarityMode.DIRICHLET_BASE);
-     // Optional BM25 parameters so we can tweak k1 and b from the command line.
+            ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, Defaults.SIMILARITY_MODE);
+    // Optional BM25 parameters so we can tweak k1 and b from the command line.
     private static final ArgSpec<Float> BM25_K1_ARG =
-            ArgSpec.optional("--bm25k1", Float::parseFloat, 1.2f);
+            ArgSpec.optional("--bm25k1", Float::parseFloat, Defaults.BM25_K1);
     private static final ArgSpec<Float> BM25_B_ARG =
-            ArgSpec.optional("--bm25b", Float::parseFloat, 0.75f);
+            ArgSpec.optional("--bm25b", Float::parseFloat, Defaults.BM25_B);
     private static final List<ArgSpec<?>> INDEX_ARGS = List.of(DOCS_ARG, INDEX_ARG);
     private static final List<ArgSpec<?>> SEARCH_ARGS = List.of(
             INDEX_ARG,
             TOPICS_ARG,
             ArgSpec.required("--output", Paths::get),
             NUM_DOCS_ARG,
-            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, QueryGeneratorFactory.QueryMode.TITLE_DESC_NARRATIVE_CLEANED)
+            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, Defaults.QUERY_MODE)
     );
     private static final List<ArgSpec<?>> EVALUATE_ARGS = List.of(DOCS_ARG, TOPICS_ARG, ArgSpec.required("--qrels", Paths::get), NUM_DOCS_ARG);
 
@@ -207,9 +209,7 @@ public class ArgsParser {
             return index().isEmpty() && search().isEmpty() && evaluate().isPresent();
         }
 
-        public abstract float bm25k1();
-
-        public abstract float bm25b();
+        public abstract Config config();
 
         @AutoValue.Builder
         abstract static class Builder {
@@ -231,14 +231,15 @@ public class ArgsParser {
 
             abstract Builder setSimilarityMode(SimilarityFactory.SimilarityMode mode);
 
+            abstract Config config();
+
+            abstract Builder setConfig(Config config);
+
             Builder setBm25Params(ParsedArgs args) throws ArgsParsingException {
-                return setBm25k1(args.get("--bm25k1", Float.class))
-                        .setBm25b(args.get("--bm25b", Float.class));
+                var k1 = args.get("--bm25k1", Float.class);
+                var b = args.get("--bm25b", Float.class);
+                return setConfig(config().toBuilder().bm25(Config.Bm25.create(k1, b)).build());
             }
-
-            abstract Builder setBm25k1(float k1);
-
-            abstract Builder setBm25b(float b);
 
             Args build() throws ArgsParsingException {
                 var result = autoBuild();
@@ -264,7 +265,7 @@ public class ArgsParser {
         }
 
         static Builder newBuilder() {
-            return new AutoValue_ArgsParser_Args.Builder().setBm25k1(1.2f).setBm25b(0.75f);
+            return new AutoValue_ArgsParser_Args.Builder().setConfig(Config.newBuilder().build());
         }
     }
 
