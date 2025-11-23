@@ -1,5 +1,7 @@
 package org.cs7is3;
 
+import org.cs7is3.config.Config;
+import org.cs7is3.config.Defaults;
 import org.cs7is3.parsing.ArgsParser;
 
 import java.io.IOException;
@@ -23,7 +25,8 @@ public class Evaluator {
             var analyzer = AnalyzerFactory.getInstance(analyzerMode);
 
             for (var similarityMode : SimilarityFactory.SimilarityMode.values()) {
-                var similarity = SimilarityFactory.getInstance(similarityMode);
+                // TODO: this is currently hardcoded, probably want a way to vary this for evaluation purposes as well.
+                var similarity = SimilarityFactory.getInstance(similarityMode, Config.newBuilder().build());
 
                 var indexer = new Indexer(analyzer, similarity);
                 var indexPath = Paths.get("matrix", String.format("%s-%s", analyzerMode, similarityMode));
@@ -31,36 +34,38 @@ public class Evaluator {
                 indexer.buildIndex(args.docs(), indexPath);
 
                 for (var queryMode : QueryGeneratorFactory.QueryMode.values()) {
-                    var fileName = String.format("%s-%s-%s", analyzerMode, similarityMode, queryMode);
-                    var queryGenerator = QueryGeneratorFactory.getInstance(queryMode);
-                    var searcher = new Searcher(analyzer, similarity, queryGenerator);
-                    var outputFile = Files.createTempFile(outputDirectory, fileName, ".run");
-                    searcher.searchTopics(indexPath, args.topics(), outputFile, args.numDocs());
+                    for (var queryParserMode : QueryGeneratorFactory.QueryParserMode.values()) {
+                        var fileName = String.format("%s-%s-%s-%s", analyzerMode, similarityMode, queryMode, queryParserMode);
+                        var queryGenerator = QueryGeneratorFactory.getInstance(queryMode, queryParserMode);
+                        var searcher = new Searcher(analyzer, similarity, queryGenerator, fileName);
+                        var outputFile = Files.createTempFile(outputDirectory, fileName, ".run");
+                        searcher.searchTopics(indexPath, args.topics(), outputFile, args.numDocs());
 
-                    var csvPath = Files.createTempFile(outputDirectory, fileName, ".csv");
-                    var markdownPath = Files.createTempFile(outputDirectory, fileName, ".md");
-                    var command = List.of(
-                            "python3",
-                            "tools/evaluate.py",
-                            args.qrelsFile().toString(),
-                            outputFile.toString(),
-                            "--out_csv",
-                            csvPath.toString(),
-                            "--out_md",
-                            markdownPath.toString()
-                    );
-                    var processBuilder = new ProcessBuilder(command);
-                    processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+                        var csvPath = Files.createTempFile(outputDirectory, fileName, ".csv");
+                        var markdownPath = Files.createTempFile(outputDirectory, fileName, ".md");
+                        var command = List.of(
+                                "python3",
+                                "tools/evaluate.py",
+                                args.qrelsFile().toString(),
+                                outputFile.toString(),
+                                "--out_csv",
+                                csvPath.toString(),
+                                "--out_md",
+                                markdownPath.toString()
+                        );
+                        var processBuilder = new ProcessBuilder(command);
+                        processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
 
-                    var process = processBuilder.start();
-                    var code = process.waitFor();
-                    if (code != 0) {
-                        System.err.printf("Evaluation script failed with error code [%d]!\n", code);
-                        System.exit(code);
+                        var process = processBuilder.start();
+                        var code = process.waitFor();
+                        if (code != 0) {
+                            System.err.printf("Evaluation script failed with error code [%d]!\n", code);
+                            System.exit(code);
+                        }
+
+                        var csvContent = Files.readString(csvPath);
+                        results.add(EvaluationResult.parse(fileName, csvContent));
                     }
-
-                    var csvContent = Files.readString(csvPath);
-                    results.add(EvaluationResult.parse(fileName, csvContent));
                 }
             }
         }

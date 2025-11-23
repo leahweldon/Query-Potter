@@ -4,6 +4,8 @@ import com.google.auto.value.AutoValue;
 import org.cs7is3.AnalyzerFactory;
 import org.cs7is3.QueryGeneratorFactory;
 import org.cs7is3.SimilarityFactory;
+import org.cs7is3.config.Config;
+import org.cs7is3.config.Defaults;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,27 +18,25 @@ public class ArgsParser {
     private static final ArgSpec<Path> INDEX_ARG = ArgSpec.required("--index", Paths::get);
     private static final ArgSpec<Path> DOCS_ARG = ArgSpec.required("--docs", Paths::get);
     private static final ArgSpec<Path> TOPICS_ARG = ArgSpec.required("--topics", Paths::get);
-    private static final ArgSpec<Integer> NUM_DOCS_ARG = ArgSpec.optional("--numDocs", Integer::parseUnsignedInt, 1_000);
-    private static final ArgSpec<AnalyzerFactory.AnalyzerMode> ANALYZER_ARG =
-            ArgSpec.optional("--analyzer", AnalyzerFactory.AnalyzerMode::valueOf, AnalyzerFactory.AnalyzerMode.ENGLISH);
-    private static final ArgSpec<SimilarityFactory.SimilarityMode> SIMILARITY_ARG =
-            ArgSpec.optional("--similarity", SimilarityFactory.SimilarityMode::valueOf, SimilarityFactory.SimilarityMode.BM25);
-
-            // Optional BM25 parameters so we can tweak k1 and b from the command line.
-    private static final ArgSpec<Float> BM25_K1_ARG =
-            ArgSpec.optional("--bm25k1", Float::parseFloat, 1.2f);
-    private static final ArgSpec<Float> BM25_B_ARG =
-            ArgSpec.optional("--bm25b", Float::parseFloat, 0.75f);
-            
-    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(ArgSpec.required("--docs", Paths::get), INDEX_ARG);
+    private static final ArgSpec<Integer> NUM_DOCS_ARG = ArgSpec.optional("--numDocs", Integer::parseUnsignedInt,
+            Defaults.NUMBER_OF_DOCUMENTS);
+    private static final ArgSpec<AnalyzerFactory.AnalyzerMode> ANALYZER_ARG = ArgSpec.optional("--analyzer",
+            AnalyzerFactory.AnalyzerMode::valueOf, Defaults.ANALYZER_MODE);
+    private static final ArgSpec<SimilarityFactory.SimilarityMode> SIMILARITY_ARG = ArgSpec.optional("--similarity",
+            SimilarityFactory.SimilarityMode::valueOf, Defaults.SIMILARITY_MODE);
+    // Optional BM25 parameters so we can tweak k1 and b from the command line.
+    private static final ArgSpec<Float> BM25_K1_ARG = ArgSpec.optional("--bm25k1", Float::parseFloat, Defaults.BM25_K1);
+    private static final ArgSpec<Float> BM25_B_ARG = ArgSpec.optional("--bm25b", Float::parseFloat, Defaults.BM25_B);
+    private static final List<ArgSpec<?>> INDEX_ARGS = List.of(DOCS_ARG, INDEX_ARG);
     private static final List<ArgSpec<?>> SEARCH_ARGS = List.of(
             INDEX_ARG,
             TOPICS_ARG,
             ArgSpec.required("--output", Paths::get),
             NUM_DOCS_ARG,
-            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, QueryGeneratorFactory.QueryMode.BOOSTED_TITLE)
-    );
-    private static final List<ArgSpec<?>> EVALUATE_ARGS = List.of(DOCS_ARG, TOPICS_ARG, ArgSpec.required("--qrels", Paths::get), NUM_DOCS_ARG);
+            ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, Defaults.QUERY_MODE),
+            ArgSpec.optional("--query-parser", QueryGeneratorFactory.QueryParserMode::valueOf, Defaults.QUERY_PARSER));
+    private static final List<ArgSpec<?>> EVALUATE_ARGS = List.of(DOCS_ARG, TOPICS_ARG,
+            ArgSpec.required("--qrels", Paths::get), NUM_DOCS_ARG);
 
     private ArgsParser() {
     }
@@ -48,10 +48,12 @@ public class ArgsParser {
 
         var mode = Mode.fromRaw(rawArgs[0]);
         var builder = Args.newBuilder();
-        if (mode.equals(Mode.HELP) || Arrays.stream(rawArgs).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
+        if (mode.equals(Mode.HELP)
+                || Arrays.stream(rawArgs).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
             System.out.println(ArgsParsingException.USAGE);
             System.exit(0);
-            // We have to have this return statement to satisfy the compiler. In reality the program will terminate so
+            // We have to have this return statement to satisfy the compiler. In reality the
+            // program will terminate so
             // this return value is useless.
             return builder.build();
         }
@@ -61,8 +63,7 @@ public class ArgsParser {
                     args.get("--docs", Path.class),
                     args.get("--topics", Path.class),
                     args.get("--qrels", Path.class),
-                    args.get("--numDocs", Integer.class)
-            );
+                    args.get("--numDocs", Integer.class));
             return builder.setEvaluate(evaluate).build();
         }
         if (mode.equals(Mode.INDEX)) {
@@ -82,8 +83,8 @@ public class ArgsParser {
                 /* topics= */ args.get("--topics", Path.class),
                 /* output= */ args.get("--output", Path.class),
                 /* numDocs= */ args.get("--numDocs", Integer.class),
-                /* queryMode = */ args.get("--query", QueryGeneratorFactory.QueryMode.class)
-        );
+                /* queryMode = */ args.get("--query", QueryGeneratorFactory.QueryMode.class),
+                /* queryParserMode = */ args.get("--query-parser", QueryGeneratorFactory.QueryParserMode.class));
         return builder
                 .setSearch(search)
                 .setAnalyzerMode(args)
@@ -94,10 +95,10 @@ public class ArgsParser {
 
     private static ParsedArgs parse(String[] rawArgs, List<ArgSpec<?>> baseSpecs) throws ArgsParsingException {
         var parsed = new HashMap<String, Object>(baseSpecs.size());
-                var specs = Stream.concat(
-                        baseSpecs.stream(),
-                        Stream.of(ANALYZER_ARG, SIMILARITY_ARG, BM25_K1_ARG, BM25_B_ARG)
-                ).collect(Collectors.toUnmodifiableSet());
+        var specs = Stream.concat(
+                baseSpecs.stream(),
+                Stream.of(ANALYZER_ARG, SIMILARITY_ARG, BM25_K1_ARG, BM25_B_ARG))
+                .collect(Collectors.toUnmodifiableSet());
 
         var namedSpecs = specs.stream().collect(Collectors.toMap(ArgSpec::name, Function.identity()));
 
@@ -139,7 +140,7 @@ public class ArgsParser {
                     search   Run a search using the provided topics
                     help     Print this message and exit
                     evaluate Evaluates all permutations of queries, analyzers and similarity scoring methods
-                
+
                 Options for `index`:
                     --docs <path>               Path to the directory containing the documents
                     --index <path>              Path to where the index will be stored
@@ -147,10 +148,10 @@ public class ArgsParser {
                     --similarity <similarity>   The similarity scorer to use. Should match the index similarity (default: BM25)
                     --bm25k1 <float>            k1 parameter for BM25 (default: 1.2)
                     --bm25b <float>             b parameter for BM25 (default: 0.75)
-                
+
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar index --docs "Assignment Two" --index index
-                
+
                 Options for `search`:
                     --index <path>              Path to the existing index for searching
                     --topics <path>             Path to the topics file to generate queries from
@@ -159,21 +160,22 @@ public class ArgsParser {
                     --analyzer <analyzer>       The analyzer to use. Should match the index analyzer (default: ENGLISH)
                     --similarity <similarity>   The similarity scorer to use. Should match the index similarity (default: BM25)
                     --query <query>             The query generator to use (default: BOOSTED_TITLE)
+                    --query-parser <parser>     The query parser to use (default: UNIFORM_MULTI_FIELDS)
                     --bm25k1 <float>            k1 parameter for BM25 (default: 1.2)
                     --bm25b <float>             b parameter for BM25 (default: 0.75)
-                
+
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar search --index index --topics topics --output runs/student.run --numDocs 1000
-                
+
                 Options for `evaluate`:
                     --docs <path>       Path to the directory containing the documents
                     --topics <path>     Path to the topics file to generate queries from
                     --qrels <path>      Path to the relevance judgements file to use in evaluation
                     --numDocs <int>     Maximum number of documents to retrieve per topic (default: 1000)
-                
+
                 Example:
                     java -jar target/cs7is3-search-1.0.0.jar evaluate --docs "Assignment Two" --topics topics --qrels qrels --numDocs 1000
-                
+
                 General options:
                     -h, --help  Display this message and exit
                 """;
@@ -189,7 +191,7 @@ public class ArgsParser {
         }
 
         public record Search(Path index, Path topics, Path output, int numDocs,
-                             QueryGeneratorFactory.QueryMode queryMode) {
+                QueryGeneratorFactory.QueryMode queryMode, QueryGeneratorFactory.QueryParserMode queryParserMode) {
         }
 
         public record Evaluate(Path docs, Path topics, Path qrelsFile, int numDocs) {
@@ -205,13 +207,11 @@ public class ArgsParser {
 
         public abstract Optional<SimilarityFactory.SimilarityMode> similarityMode();
 
-        // BM25 parameters extracted from command-line if provided
-        public abstract float bm25k1();
-        public abstract float bm25b();
-
         public boolean isEvaluateMode() {
             return index().isEmpty() && search().isEmpty() && evaluate().isPresent();
         }
+
+        public abstract Config config();
 
         @AutoValue.Builder
         abstract static class Builder {
@@ -233,14 +233,15 @@ public class ArgsParser {
 
             abstract Builder setSimilarityMode(SimilarityFactory.SimilarityMode mode);
 
+            abstract Config config();
+
+            abstract Builder setConfig(Config config);
+
             Builder setBm25Params(ParsedArgs args) throws ArgsParsingException {
-                return setBm25k1(args.get("--bm25k1", Float.class))
-                        .setBm25b(args.get("--bm25b", Float.class));
+                var k1 = args.get("--bm25k1", Float.class);
+                var b = args.get("--bm25b", Float.class);
+                return setConfig(config().toBuilder().bm25(Config.Bm25.create(k1, b)).build());
             }
-
-            abstract Builder setBm25k1(float k1);
-
-            abstract Builder setBm25b(float b);
 
             Args build() throws ArgsParsingException {
                 var result = autoBuild();
@@ -266,7 +267,7 @@ public class ArgsParser {
         }
 
         static Builder newBuilder() {
-            return new AutoValue_ArgsParser_Args.Builder();
+            return new AutoValue_ArgsParser_Args.Builder().setConfig(Config.newBuilder().build());
         }
     }
 
