@@ -51,8 +51,8 @@ public class Searcher {
     // PRF configuration: these can be tuned later.
     private static final int PRF_FEEDBACK_DOCS = 50; // how many top docs to use as feedback
     private static final int PRF_EXPANSION_DOCS = 20; // how many of those docs to read terms from
-    private static final int PRF_EXPANSION_TERMS = 40; // how many expansion terms to add
-    private static final float PRF_EXPANSION_BOOST = 0.75f;
+    private static final int PRF_EXPANSION_TERMS = 30; // how many expansion terms to add
+    private static final float PRF_EXPANSION_BOOST = 1.5f;
 
     private final Analyzer analyzer;
     private final Similarity similarity;
@@ -172,8 +172,38 @@ public class Searcher {
                 accumulateTermsFromField(analyzer, termScores, "TITLE", doc.get("TITLE"));
             }
 
-            // Select top PRF_EXPANSION_TERMS by term score
-            var topTerms = termScores.entrySet().stream()
+            // Select top PRF_EXPANSION_TERMS by TF×IDF score
+            var reader = searcher.getIndexReader();
+            int maxDoc = reader.maxDoc();
+
+            var weightedScores = new HashMap<String, Float>();
+
+            termScores.forEach((termText, tf) -> {
+                try {
+                    // Use BODY docFreq as a proxy for how common the term is in collection
+                    int df = reader.docFreq(new Term("BODY", termText));
+                    if (df <= 0) {
+                        return;
+                    }
+
+                    // simple idf
+                    float idf = (float) Math.log((maxDoc + 1.0) / (df + 1.0));
+
+                    // TF×IDF score
+                    float score = tf * idf;
+
+                    // Optionally, can ignore very common terms with tiny idf
+                    if (idf < 0.1f) {
+                        return;
+                    }
+
+                    weightedScores.put(termText, score);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+
+            var topTerms = weightedScores.entrySet().stream()
                     .sorted((a, b) -> Float.compare(b.getValue(), a.getValue()))
                     .limit(PRF_EXPANSION_TERMS)
                     .map(Map.Entry::getKey)

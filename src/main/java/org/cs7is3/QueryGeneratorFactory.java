@@ -11,11 +11,14 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermQuery; // NEW: needed for narrative negatives
 import org.cs7is3.parsing.TopicsParser;
 
 import java.util.ArrayList;
+import java.util.HashSet; // NEW: for narrative negative terms
 import java.util.List;
 import java.util.Map;
+import java.util.Set; // NEW: for narrative negative terms
 
 public class QueryGeneratorFactory {
     // A QueryGeneratorFactory constructs queries for a given topic. These queries
@@ -38,7 +41,8 @@ public class QueryGeneratorFactory {
         TITLE_DESC, // title + description
         TITLE_DESC_NARRATIVE_CLEANED, // title + desc + cleaned narrative
         MULTI_QUERY_RRF, // multiple complementary queries fused via RRF
-        PRF_TITLE_DESC_NARRATIVE_CLEANED // PRF on top of title+desc+cleaned narrative
+        PRF_TITLE_DESC_NARRATIVE_CLEANED, // PRF on top of title+desc+cleaned narrative
+        PRF_ENSEMBLE_TDN // NEW: PRF ensemble (TDN + title + desc + phrases)
     }
 
     public enum QueryParserMode {
@@ -54,6 +58,7 @@ public class QueryGeneratorFactory {
             case TITLE_DESC_NARRATIVE_CLEANED -> new TitleDescNarrativeCleanedQueryGenerator();
             case MULTI_QUERY_RRF -> new MultiQueryRrfGenerator();
             case PRF_TITLE_DESC_NARRATIVE_CLEANED -> new PrfTitleDescNarrativeCleanedQueryGenerator();
+            case PRF_ENSEMBLE_TDN -> new PrfEnsembleTdnQueryGenerator(); // NEW
         };
         return generator.withParser(queryParserMode);
     }
@@ -94,6 +99,45 @@ public class QueryGeneratorFactory {
             kept.append(raw).append(' ');
         }
         return normalise(kept.toString());
+    }
+
+    // NEW: Extract "negative" concepts from the narrative, based on sentences that
+    // say
+    // things are "not relevant" or "irrelevant". We use these later as MUST_NOT
+    // terms.
+    private static List<String> extractNegativeNarrativeTerms(String narrative) {
+        if (narrative == null) {
+            return List.of();
+        }
+        var sentences = narrative.split("[.!?]");
+        Set<String> terms = new HashSet<>();
+
+        for (String raw : sentences) {
+            var s = raw.toLowerCase();
+            if (!(s.contains("not relevant") || s.contains("irrelevant"))) {
+                continue;
+            }
+
+            // strip punctuation
+            s = s.replaceAll("[^a-z0-9\\s]", " ");
+            var tokens = s.split("\\s+");
+            for (String token : tokens) {
+                if (token.length() < 4) {
+                    continue;
+                }
+                // ignore generic words
+                if (token.equals("only") || token.equals("alone") || token.equals("simply")
+                        || token.equals("general") || token.equals("merely") || token.equals("just")) {
+                    continue;
+                }
+                terms.add(token);
+            }
+        }
+
+        if (terms.isEmpty()) {
+            return List.of();
+        }
+        return new ArrayList<>(terms);
     }
 
     // Helper to parse some text using a QueryParser after normalisation and
@@ -254,6 +298,57 @@ public class QueryGeneratorFactory {
             queries.add(base);
 
             // Add a few boosted phrase queries from the title as additional base queries.
+            queries.addAll(buildTitlePhraseQueries(topic.title()));
+
+            return queries;
+        }
+    }
+
+    // NEW: PRF ensemble: base TDN (with negative narrative terms as MUST_NOT),
+    // title-only view, description-focused view, and boosted title phrases.
+    private static final class PrfEnsembleTdnQueryGenerator
+            extends ConfigurableQueryGenerator
+            implements PrfQueryGenerator {
+
+        @Override
+        public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
+            var parser = queryParser(analyzer);
+
+            var titleQuery = parseText(parser, topic.title());
+            var descQuery = parseText(parser, topic.description());
+            var cleanedNarrative = cleanNarrative(topic.narrative());
+            var narrQuery = parseText(parser, cleanedNarrative);
+
+            var negativeTerms = extractNegativeNarrativeTerms(topic.narrative());
+
+            // Base TDN query with narrative, plus MUST_NOT terms from negative narrative.
+            var baseBuilder = new BooleanQuery.Builder()
+                    .add(new BoostQuery(titleQuery, 2.0f), BooleanClause.Occur.MUST)
+                    .add(new BoostQuery(descQuery, 1.0f), BooleanClause.Occur.SHOULD)
+                    .add(new BoostQuery(narrQuery, 0.7f), BooleanClause.Occur.SHOULD);
+
+            for (String termText : negativeTerms) {
+                var termQuery = new TermQuery(new Term("BODY", termText));
+                baseBuilder.add(termQuery, BooleanClause.Occur.MUST_NOT);
+            }
+
+            var baseTdn = baseBuilder.build();
+
+            var queries = new ArrayList<Query>();
+            queries.add(baseTdn);
+
+            // Title-only view (very aggressive on title terms).
+            var titleOnlyBuilder = new BooleanQuery.Builder()
+                    .add(new BoostQuery(titleQuery, 3.0f), BooleanClause.Occur.MUST);
+            queries.add(titleOnlyBuilder.build());
+
+            // Description-focused view.
+            var descOnlyBuilder = new BooleanQuery.Builder()
+                    .add(new BoostQuery(descQuery, 2.0f), BooleanClause.Occur.MUST)
+                    .add(new BoostQuery(titleQuery, 1.0f), BooleanClause.Occur.SHOULD);
+            queries.add(descOnlyBuilder.build());
+
+            // Boosted title phrases as separate base queries.
             queries.addAll(buildTitlePhraseQueries(topic.title()));
 
             return queries;
