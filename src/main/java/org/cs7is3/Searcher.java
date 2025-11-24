@@ -21,6 +21,14 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.FSDirectory;
 import org.cs7is3.parsing.TopicsParser;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.BoostQuery;
+import org.apache.lucene.search.Query;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -28,16 +36,23 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Searcher {
     // Empirical value used for RRF, set to 60.0 per Cormack et. al (2009, DOI:
     // 10.1145/1571941.1572114).
     private static final Double K = 60.0;
+    // PRF configuration: these can be tuned later.
+    private static final int PRF_FEEDBACK_DOCS = 50; // how many top docs to use as feedback
+    private static final int PRF_EXPANSION_DOCS = 20; // how many of those docs to read terms from
+    private static final int PRF_EXPANSION_TERMS = 40; // how many expansion terms to add
+    private static final float PRF_EXPANSION_BOOST = 0.75f;
 
     private final Analyzer analyzer;
     private final Similarity similarity;
@@ -70,7 +85,16 @@ public class Searcher {
 
             topics.forEach(topic -> {
                 try {
-                    var queries = queryGenerator.generateQueries(analyzer, topic);
+                    // Base queries from configured QueryGenerator
+                    var baseQueries = queryGenerator.generateQueries(analyzer, topic);
+                    List<org.apache.lucene.search.Query> queries = baseQueries;
+
+                    // If PRF-enabled generator, augment with expansion queries built from
+                    // top-ranked docs
+                    if (queryGenerator instanceof QueryGeneratorFactory.PrfQueryGenerator) {
+                        queries = applyPrfExpansion(analyzer, searcher, baseQueries, topic, numDocs);
+                    }
+
                     var results = queries.stream().map(query -> {
                         try {
                             var scoreDocs = searcher.search(query, numDocs).scoreDocs;
@@ -107,6 +131,108 @@ public class Searcher {
                 StandardOpenOption.WRITE)) {
             writer.write(output.toString());
         }
+    }
+
+    // For PRF: given base queries, build expanded queries using top-ranked
+    // documents as pseudo-relevant feedback.
+    // Returns list containing both original base queries & expansion queries.
+    private List<Query> applyPrfExpansion(
+            Analyzer analyzer,
+            IndexSearcher searcher,
+            List<Query> baseQueries,
+            TopicsParser.Topic topic,
+            int numDocs) {
+
+        var allQueries = new ArrayList<Query>(baseQueries);
+
+        for (Query baseQuery : baseQueries) {
+            // First pass: get top feedback docs for the base query
+            org.apache.lucene.search.TopDocs feedbackTopDocs;
+            try {
+                feedbackTopDocs = searcher.search(baseQuery, PRF_FEEDBACK_DOCS);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+
+            var termScores = new HashMap<String, Float>();
+
+            // Collect terms from the top PRF_EXPANSION_DOCS documents
+            int docsToUse = Math.min(PRF_EXPANSION_DOCS, feedbackTopDocs.scoreDocs.length);
+            for (int i = 0; i < docsToUse; i++) {
+                ScoreDoc sd = feedbackTopDocs.scoreDocs[i];
+                org.apache.lucene.document.Document doc;
+                try {
+                    doc = searcher.storedFields().document(sd.doc);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+
+                // We focus on BODY & TITLE as feedback fields
+                accumulateTermsFromField(analyzer, termScores, "BODY", doc.get("BODY"));
+                accumulateTermsFromField(analyzer, termScores, "TITLE", doc.get("TITLE"));
+            }
+
+            // Select top PRF_EXPANSION_TERMS by term score
+            var topTerms = termScores.entrySet().stream()
+                    .sorted((a, b) -> Float.compare(b.getValue(), a.getValue()))
+                    .limit(PRF_EXPANSION_TERMS)
+                    .map(Map.Entry::getKey)
+                    .toList();
+
+            if (!topTerms.isEmpty()) {
+                Query expandedQuery = buildExpandedQuery(baseQuery, topTerms);
+                allQueries.add(expandedQuery);
+            }
+        }
+
+        return allQueries;
+    }
+
+    // Tokenize given field text & accumulate term frequencies into score map
+    private void accumulateTermsFromField(
+            Analyzer analyzer,
+            Map<String, Float> termScores,
+            String fieldName,
+            String text) {
+
+        if (text == null || text.isBlank()) {
+            return;
+        }
+
+        try (TokenStream ts = analyzer.tokenStream(fieldName, text)) {
+            var termAttr = ts.addAttribute(CharTermAttribute.class);
+            ts.reset();
+            while (ts.incrementToken()) {
+                var term = termAttr.toString();
+                // Increase score - could be weighted by document score etc. if we want to mak
+                // it more sophisticated
+                termScores.merge(term, 1.0f, Float::sum);
+            }
+            ts.end();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    // Build expanded query that keeps original base query and adds expansion terms
+    // on BODY field with moderate boost
+    private org.apache.lucene.search.Query buildExpandedQuery(
+            org.apache.lucene.search.Query baseQuery,
+            List<String> expansionTerms) {
+
+        var builder = new BooleanQuery.Builder();
+
+        // Keep the original query as a strong MUST
+        builder.add(baseQuery, BooleanClause.Occur.MUST);
+
+        // Add expansion terms as BODY terms with smaller boost
+        for (var termText : expansionTerms) {
+            var termQuery = new TermQuery(new Term("BODY", termText));
+            var boosted = new BoostQuery(termQuery, PRF_EXPANSION_BOOST);
+            builder.add(boosted, BooleanClause.Occur.SHOULD);
+        }
+
+        return builder.build();
     }
 
     // Performs Reciprocal Rank Fusion (RRF) to combine multiple rankings for a

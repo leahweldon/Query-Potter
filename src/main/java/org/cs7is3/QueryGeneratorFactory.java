@@ -1,6 +1,7 @@
 package org.cs7is3;
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -8,6 +9,7 @@ import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BoostQuery;
+import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
 import org.cs7is3.parsing.TopicsParser;
 
@@ -16,19 +18,27 @@ import java.util.List;
 import java.util.Map;
 
 public class QueryGeneratorFactory {
-    // A QueryGeneratorFactory constructs queries for a given topic. These queries are then run against the index and
-    // combined using Reciprocal Rank Fusion into 1 single rank that is then used as the output for a single topic.
+    // A QueryGeneratorFactory constructs queries for a given topic. These queries
+    // are then run against the index and
+    // combined using Reciprocal Rank Fusion into 1 single rank that is then used as
+    // the output for a single topic.
     // Multiple queries may be returned or just a singleton.
     interface QueryGenerator {
         List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException;
     }
 
+    // Marker interface for generators that should be used with PRF logic in
+    // Searcher.
+    interface PrfQueryGenerator extends QueryGenerator {
+    }
+
     public enum QueryMode {
-        BOOSTED_TITLE,                    // existing baseline
-        TITLE_ONLY,                       // title only
-        TITLE_DESC,                       // title + description
-        TITLE_DESC_NARRATIVE_CLEANED,     // title + desc + cleaned narrative
-        MULTI_QUERY_RRF                   // multiple complementary queries fused via RRF
+        BOOSTED_TITLE, // existing baseline
+        TITLE_ONLY, // title only
+        TITLE_DESC, // title + description
+        TITLE_DESC_NARRATIVE_CLEANED, // title + desc + cleaned narrative
+        MULTI_QUERY_RRF, // multiple complementary queries fused via RRF
+        PRF_TITLE_DESC_NARRATIVE_CLEANED // PRF on top of title+desc+cleaned narrative
     }
 
     public enum QueryParserMode {
@@ -43,6 +53,7 @@ public class QueryGeneratorFactory {
             case TITLE_DESC -> new TitleDescQueryGenerator();
             case TITLE_DESC_NARRATIVE_CLEANED -> new TitleDescNarrativeCleanedQueryGenerator();
             case MULTI_QUERY_RRF -> new MultiQueryRrfGenerator();
+            case PRF_TITLE_DESC_NARRATIVE_CLEANED -> new PrfTitleDescNarrativeCleanedQueryGenerator();
         };
         return generator.withParser(queryParserMode);
     }
@@ -55,8 +66,10 @@ public class QueryGeneratorFactory {
         return text.replaceAll("\\s+", " ").trim();
     }
 
-    // Cleaning up the narrative by dropping sentences that explicitly talk about irrelevance.
-    // This is simple, but it helps avoid putting a lot of "not relevant" boilerplate into the query.
+    // Cleaning up the narrative by dropping sentences that explicitly talk about
+    // irrelevance.
+    // This is simple, but it helps avoid putting a lot of "not relevant"
+    // boilerplate into the query.
     private static String cleanNarrative(String narrative) {
         if (narrative == null) {
             return "";
@@ -83,7 +96,8 @@ public class QueryGeneratorFactory {
         return normalise(kept.toString());
     }
 
-    // Helper to parse some text using a MultiFieldQueryParser after normalisation and escaping.
+    // Helper to parse some text using a QueryParser after normalisation and
+    // escaping.
     private static Query parseText(QueryParser parser, String text) throws ParseException {
         var normalised = normalise(text);
         if (normalised.isEmpty()) {
@@ -102,11 +116,11 @@ public class QueryGeneratorFactory {
         }
 
         protected QueryParser queryParser(Analyzer analyzer) {
-            var coreFields = new String[]{"TITLE", "BODY"};
+            var coreFields = new String[] { "TITLE", "BODY" };
             return switch (queryParserMode) {
                 case UNIFORM_MULTI_FIELDS -> new MultiFieldQueryParser(coreFields, analyzer);
                 case WEAK_TITLE_STRONG_CONTENT ->
-                        new MultiFieldQueryParser(coreFields, analyzer, Map.of("TITLE", 0.08f, "BODY", 0.92f));
+                    new MultiFieldQueryParser(coreFields, analyzer, Map.of("TITLE", 0.08f, "BODY", 0.92f));
             };
         }
     }
@@ -173,7 +187,81 @@ public class QueryGeneratorFactory {
         }
     }
 
-    // Multi-query generator: return several complementary queries and let the Searcher fuse them with RRF.
+    // Build a small set of phrase queries from the title, e.g. "peace talks", "oil
+    // prices".
+    // These are matched against BODY, since BODY contains the full article text.
+    private static List<Query> buildTitlePhraseQueries(String titleText) {
+        var phrases = new ArrayList<Query>();
+        var normalised = normalise(titleText);
+        if (normalised.isEmpty()) {
+            return phrases;
+        }
+
+        var tokens = normalised.split("\\s+");
+        if (tokens.length < 2) {
+            return phrases;
+        }
+
+        // Limit to a few top bigrams to avoid generating too many phrase queries.
+        int maxPhrases = 3;
+        int count = 0;
+
+        for (int i = 0; i < tokens.length - 1 && count < maxPhrases; i++) {
+            var t1 = tokens[i];
+            var t2 = tokens[i + 1];
+
+            // Skip very short or stopword-ish tokens.
+            if (t1.length() < 3 || t2.length() < 3) {
+                continue;
+            }
+
+            var builder = new PhraseQuery.Builder();
+            builder.setSlop(2); // allow slight gaps / reordering
+            builder.add(new Term("BODY", t1));
+            builder.add(new Term("BODY", t2));
+            var phrase = builder.build();
+
+            // Boost phrases quite strongly since they are highly indicative.
+            phrases.add(new BoostQuery(phrase, 3.0f));
+            count++;
+        }
+
+        return phrases;
+    }
+
+    // PRF variant: same base query as TitleDescNarrativeCleanedQueryGenerator,
+    // but tagged so the Searcher knows to perform PRF using top-ranked documents,
+    // and also generates extra phrase queries from the title.
+    private static final class PrfTitleDescNarrativeCleanedQueryGenerator
+            extends ConfigurableQueryGenerator
+            implements PrfQueryGenerator {
+
+        @Override
+        public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
+            var parser = queryParser(analyzer);
+            var titleQuery = parseText(parser, topic.title());
+            var descQuery = parseText(parser, topic.description());
+            var cleanedNarrative = cleanNarrative(topic.narrative());
+            var narrQuery = parseText(parser, cleanedNarrative);
+
+            var base = new BooleanQuery.Builder()
+                    .add(new BoostQuery(titleQuery, 2.0f), BooleanClause.Occur.MUST)
+                    .add(new BoostQuery(descQuery, 1.0f), BooleanClause.Occur.SHOULD)
+                    .add(new BoostQuery(narrQuery, 0.7f), BooleanClause.Occur.SHOULD)
+                    .build();
+
+            var queries = new ArrayList<Query>();
+            queries.add(base);
+
+            // Add a few boosted phrase queries from the title as additional base queries.
+            queries.addAll(buildTitlePhraseQueries(topic.title()));
+
+            return queries;
+        }
+    }
+
+    // Multi-query generator: return several complementary queries and let the
+    // Searcher fuse them with RRF.
     // Q1: title-only (strong boost)
     // Q2: title + description
     // Q3: cleaned narrative only (smaller boost)
@@ -203,5 +291,4 @@ public class QueryGeneratorFactory {
             return queries;
         }
     }
-
 }
