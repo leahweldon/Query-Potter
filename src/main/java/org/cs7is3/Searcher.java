@@ -172,7 +172,7 @@ public class Searcher {
                 accumulateTermsFromField(analyzer, termScores, "TITLE", doc.get("TITLE"));
             }
 
-            // Select top PRF_EXPANSION_TERMS by TF×IDF score
+            // TF×IDF scoring
             var reader = searcher.getIndexReader();
             int maxDoc = reader.maxDoc();
 
@@ -180,23 +180,16 @@ public class Searcher {
 
             termScores.forEach((termText, tf) -> {
                 try {
-                    // Use BODY docFreq as a proxy for how common the term is in collection
                     int df = reader.docFreq(new Term("BODY", termText));
                     if (df <= 0) {
                         return;
                     }
-
-                    // simple idf
                     float idf = (float) Math.log((maxDoc + 1.0) / (df + 1.0));
-
-                    // TF×IDF score
-                    float score = tf * idf;
-
-                    // Optionally, can ignore very common terms with tiny idf
+                    // basic idf floor to remove extremely common junk
                     if (idf < 0.1f) {
                         return;
                     }
-
+                    float score = tf * idf;
                     weightedScores.put(termText, score);
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);

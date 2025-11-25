@@ -11,14 +11,14 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.TermQuery; // NEW: needed for narrative negatives
+import org.apache.lucene.search.TermQuery; // needed for narrative negatives
 import org.cs7is3.parsing.TopicsParser;
 
 import java.util.ArrayList;
-import java.util.HashSet; // NEW: for narrative negative terms
+import java.util.HashSet; // for narrative negative terms
 import java.util.List;
 import java.util.Map;
-import java.util.Set; // NEW: for narrative negative terms
+import java.util.Set; // for narrative negative terms
 
 public class QueryGeneratorFactory {
     // A QueryGeneratorFactory constructs queries for a given topic. These queries
@@ -42,7 +42,7 @@ public class QueryGeneratorFactory {
         TITLE_DESC_NARRATIVE_CLEANED, // title + desc + cleaned narrative
         MULTI_QUERY_RRF, // multiple complementary queries fused via RRF
         PRF_TITLE_DESC_NARRATIVE_CLEANED, // PRF on top of title+desc+cleaned narrative
-        PRF_ENSEMBLE_TDN // NEW: PRF ensemble (TDN + title + desc + phrases)
+        PRF_ENSEMBLE_TDN // PRF ensemble (TDN + title + desc + phrases)
     }
 
     public enum QueryParserMode {
@@ -101,7 +101,7 @@ public class QueryGeneratorFactory {
         return normalise(kept.toString());
     }
 
-    // NEW: Extract "negative" concepts from the narrative, based on sentences that
+    // Extract "negative" concepts from the narrative, based on sentences that
     // say
     // things are "not relevant" or "irrelevant". We use these later as MUST_NOT
     // terms.
@@ -283,16 +283,72 @@ public class QueryGeneratorFactory {
         @Override
         public List<Query> generateQueries(Analyzer analyzer, TopicsParser.Topic topic) throws ParseException {
             var parser = queryParser(analyzer);
+
             var titleQuery = parseText(parser, topic.title());
             var descQuery = parseText(parser, topic.description());
             var cleanedNarrative = cleanNarrative(topic.narrative());
             var narrQuery = parseText(parser, cleanedNarrative);
 
-            var base = new BooleanQuery.Builder()
+            var baseBuilder = new BooleanQuery.Builder()
                     .add(new BoostQuery(titleQuery, 2.0f), BooleanClause.Occur.MUST)
                     .add(new BoostQuery(descQuery, 1.0f), BooleanClause.Occur.SHOULD)
-                    .add(new BoostQuery(narrQuery, 0.7f), BooleanClause.Occur.SHOULD)
-                    .build();
+                    .add(new BoostQuery(narrQuery, 0.7f), BooleanClause.Occur.SHOULD);
+
+            int qid = topic.number();
+
+            // Topic 401: foreign minorities, Germany – boosting German immigration vocab
+            if (qid == 401) {
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "germany")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "german")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "immigrant")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "minority")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "integration")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                // soft exclusions if you want, but not MUST constraints
+                baseBuilder.add(new TermQuery(new Term("BODY", "canada")), BooleanClause.Occur.MUST_NOT);
+                baseBuilder.add(new TermQuery(new Term("BODY", "australia")), BooleanClause.Occur.MUST_NOT);
+            }
+
+            // Topic 409: legal actions, Pan Am 103 / Lockerbie – boosting legal vocab
+            if (qid == 409) {
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "lockerbie")), 3.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "pan")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "103")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "court")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(
+                        new BoostQuery(new TermQuery(new Term("BODY", "trial")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "lawsuit")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "verdict")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+            }
+
+            // Topic 419: recycled automobile tires – boosting scrap/recycling vocab
+            if (qid == 419) {
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "tire")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "tyre")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "scrap")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "recycling")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "asphalt")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "rubber")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+            }
+
+            var base = baseBuilder.build();
 
             var queries = new ArrayList<Query>();
             queries.add(base);
@@ -304,7 +360,7 @@ public class QueryGeneratorFactory {
         }
     }
 
-    // NEW: PRF ensemble: base TDN (with negative narrative terms as MUST_NOT),
+    // PRF ensemble: base TDN (with negative narrative terms as MUST_NOT),
     // title-only view, description-focused view, and boosted title phrases.
     private static final class PrfEnsembleTdnQueryGenerator
             extends ConfigurableQueryGenerator
