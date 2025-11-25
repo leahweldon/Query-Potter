@@ -43,7 +43,7 @@ public class Indexer {
                 .setSimilarity(similarity);
 
         try (IndexWriter writer = new IndexWriter(directory, config);
-             var documents = DocumentsParser.parse(docsPath)) {
+                var documents = DocumentsParser.parse(docsPath)) {
 
             documents.forEach(doc -> {
                 Document luceneDoc = new Document();
@@ -52,7 +52,8 @@ public class Indexer {
                 luceneDoc.add(new TextField("TITLE", doc.title() != null ? doc.title() : "", Field.Store.YES));
                 luceneDoc.add(new StringField("AUTHOR", doc.author() != null ? doc.author() : "", Field.Store.YES));
                 luceneDoc.add(new TextField("BODY", doc.body() != null ? doc.body() : "", Field.Store.YES));
-                luceneDoc.add(new StringField("DATE", doc.publicationDate() != null ? doc.publicationDate() : "", Field.Store.YES));
+                luceneDoc.add(new StringField("DATE", doc.publicationDate() != null ? doc.publicationDate() : "",
+                        Field.Store.YES));
 
                 try {
                     writer.addDocument(luceneDoc);
