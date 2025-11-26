@@ -302,21 +302,34 @@ public class QueryGeneratorFactory {
 
             int qid = topic.number();
 
-            // Topic 401: foreign minorities, Germany – boosting German immigration vocab
             if (qid == 401) {
-                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "germany")), 2.0f),
+                // Stronger emphasis on Germany + minorities + immigration/integration
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "germany")), 2.5f),
                         BooleanClause.Occur.SHOULD);
-                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "german")), 1.5f),
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "german")), 2.0f),
                         BooleanClause.Occur.SHOULD);
-                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "immigrant")), 1.5f),
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "immigrant")), 2.0f),
                         BooleanClause.Occur.SHOULD);
-                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "minority")), 1.5f),
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "immigration")), 2.0f),
                         BooleanClause.Occur.SHOULD);
-                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "integration")), 1.5f),
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "minority")), 2.0f),
                         BooleanClause.Occur.SHOULD);
-                // soft exclusions, but not MUST constraints
-                baseBuilder.add(new TermQuery(new Term("BODY", "canada")), BooleanClause.Occur.MUST_NOT);
-                baseBuilder.add(new TermQuery(new Term("BODY", "australia")), BooleanClause.Occur.MUST_NOT);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "minorities")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "foreign")), 1.8f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "integration")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+
+                // Some Germany-specific minority cues that often appear in relevant docs
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "turkish")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "xenophobia")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+
+                // Keep negatives but only for really non-Germany contexts.
+                baseBuilder.add(new TermQuery(new Term("BODY", "mexico")), BooleanClause.Occur.MUST_NOT);
+                baseBuilder.add(new TermQuery(new Term("BODY", "california")), BooleanClause.Occur.MUST_NOT);
             }
 
             // Topic 409: legal actions, Pan Am 103 / Lockerbie – boosting legal vocab
