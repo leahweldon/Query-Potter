@@ -314,7 +314,7 @@ public class QueryGeneratorFactory {
                         BooleanClause.Occur.SHOULD);
                 baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "integration")), 1.5f),
                         BooleanClause.Occur.SHOULD);
-                // soft exclusions if you want, but not MUST constraints
+                // soft exclusions, but not MUST constraints
                 baseBuilder.add(new TermQuery(new Term("BODY", "canada")), BooleanClause.Occur.MUST_NOT);
                 baseBuilder.add(new TermQuery(new Term("BODY", "australia")), BooleanClause.Occur.MUST_NOT);
             }
@@ -354,12 +354,37 @@ public class QueryGeneratorFactory {
                         BooleanClause.Occur.SHOULD);
             }
 
+            // Topic 421: industrial waste disposal – boost industrial/hazardous waste vocab
+            // and filter nuclear noise
+            if (qid == 421) {
+                // Positive industrial waste cues
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "industrial")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "waste")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "disposal")), 2.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "incinerator")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "landfill")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "sludge")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "toxic")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+
+                // Exclude nuclear/radioactive waste, per narrative
+                baseBuilder.add(new TermQuery(new Term("BODY", "nuclear")), BooleanClause.Occur.MUST_NOT);
+                baseBuilder.add(new TermQuery(new Term("BODY", "radioactive")), BooleanClause.Occur.MUST_NOT);
+                baseBuilder.add(new TermQuery(new Term("BODY", "uranium")), BooleanClause.Occur.MUST_NOT);
+            }
+
             var base = baseBuilder.build();
 
             var queries = new ArrayList<Query>();
             queries.add(base);
 
-            // Add a few boosted phrase queries from the title as additional base queries
+            // Add a few boosted phrase queries from the title as additional base queries.
             queries.addAll(buildTitlePhraseQueries(topic.title()));
 
             return queries;
