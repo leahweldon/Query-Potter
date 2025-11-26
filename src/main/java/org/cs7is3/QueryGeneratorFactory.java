@@ -246,7 +246,7 @@ public class QueryGeneratorFactory {
             return phrases;
         }
 
-        // Limit to a few top bigrams to avoid generating too many phrase queries.
+        // Limit to a few top bigrams to avoid generating too many phrase queries
         int maxPhrases = 3;
         int count = 0;
 
@@ -254,7 +254,7 @@ public class QueryGeneratorFactory {
             var t1 = tokens[i];
             var t2 = tokens[i + 1];
 
-            // Skip very short or stopword-ish tokens.
+            // Skip very short or stopword-ish tokens
             if (t1.length() < 3 || t2.length() < 3) {
                 continue;
             }
@@ -289,10 +289,16 @@ public class QueryGeneratorFactory {
             var cleanedNarrative = cleanNarrative(topic.narrative());
             var narrQuery = parseText(parser, cleanedNarrative);
 
-            var baseBuilder = new BooleanQuery.Builder()
-                    .add(new BoostQuery(titleQuery, 2.0f), BooleanClause.Occur.MUST)
-                    .add(new BoostQuery(descQuery, 1.0f), BooleanClause.Occur.SHOULD)
-                    .add(new BoostQuery(narrQuery, 0.7f), BooleanClause.Occur.SHOULD);
+            var baseBuilder = new BooleanQuery.Builder();
+
+            // Title signal – repeated three times with decreasing strength
+            baseBuilder.add(new BoostQuery(titleQuery, 2.0f), BooleanClause.Occur.MUST); // core, required
+            baseBuilder.add(new BoostQuery(titleQuery, 1.5f), BooleanClause.Occur.SHOULD); // extra boost
+            baseBuilder.add(new BoostQuery(titleQuery, 1.0f), BooleanClause.Occur.SHOULD); // extra boost
+
+            // Description + narrative as usual
+            baseBuilder.add(new BoostQuery(descQuery, 1.0f), BooleanClause.Occur.SHOULD);
+            baseBuilder.add(new BoostQuery(narrQuery, 0.7f), BooleanClause.Occur.SHOULD);
 
             int qid = topic.number();
 
@@ -353,7 +359,7 @@ public class QueryGeneratorFactory {
             var queries = new ArrayList<Query>();
             queries.add(base);
 
-            // Add a few boosted phrase queries from the title as additional base queries.
+            // Add a few boosted phrase queries from the title as additional base queries
             queries.addAll(buildTitlePhraseQueries(topic.title()));
 
             return queries;

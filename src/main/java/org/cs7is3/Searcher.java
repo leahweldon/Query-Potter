@@ -134,8 +134,8 @@ public class Searcher {
     }
 
     // For PRF: given base queries, build expanded queries using top-ranked
-    // documents as pseudo-relevant feedback.
-    // Returns list containing both original base queries & expansion queries.
+    // documents as pseudo-relevant feedback
+    // Returns list containing both original base queries & expansion queries
     private List<Query> applyPrfExpansion(
             Analyzer analyzer,
             IndexSearcher searcher,
@@ -146,7 +146,7 @@ public class Searcher {
         var allQueries = new ArrayList<Query>(baseQueries);
 
         for (Query baseQuery : baseQueries) {
-            // First pass: get top feedback docs for the base query
+            // First pass: get top feedback docs for base query
             org.apache.lucene.search.TopDocs feedbackTopDocs;
             try {
                 feedbackTopDocs = searcher.search(baseQuery, PRF_FEEDBACK_DOCS);
@@ -156,7 +156,7 @@ public class Searcher {
 
             var termScores = new HashMap<String, Float>();
 
-            // Collect terms from the top PRF_EXPANSION_DOCS documents
+            // Collect terms from top PRF_EXPANSION_DOCS documents
             int docsToUse = Math.min(PRF_EXPANSION_DOCS, feedbackTopDocs.scoreDocs.length);
             for (int i = 0; i < docsToUse; i++) {
                 ScoreDoc sd = feedbackTopDocs.scoreDocs[i];
@@ -167,7 +167,7 @@ public class Searcher {
                     throw new UncheckedIOException(e);
                 }
 
-                // We focus on BODY & TITLE as feedback fields
+                // Focus on BODY & TITLE as feedback fields
                 accumulateTermsFromField(analyzer, termScores, "BODY", doc.get("BODY"));
                 accumulateTermsFromField(analyzer, termScores, "TITLE", doc.get("TITLE"));
             }
