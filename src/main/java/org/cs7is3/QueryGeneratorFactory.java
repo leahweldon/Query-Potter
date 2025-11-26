@@ -332,23 +332,56 @@ public class QueryGeneratorFactory {
                 baseBuilder.add(new TermQuery(new Term("BODY", "california")), BooleanClause.Occur.MUST_NOT);
             }
 
-            // Topic 409: legal actions, Pan Am 103 / Lockerbie – boosting legal vocab
+            // Topic 405: cosmic events – boost actual astronomical / transient event vocab
+            if (qid == 405) {
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "supernova")), 2.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "comet")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "meteor")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "asteroid")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "gamma")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "burst")), 1.2f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "telescope")), 1.2f),
+                        BooleanClause.Occur.SHOULD);
+            }
+
+            // Topic 409: legal actions re: Pan Am 103 / Lockerbie – boost legal outcome
+            // vocab
             if (qid == 409) {
+                // Maintain strong focus on Lockerbie / Pan Am 103
                 baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "lockerbie")), 3.0f),
                         BooleanClause.Occur.SHOULD);
                 baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "pan")), 2.0f),
                         BooleanClause.Occur.SHOULD);
                 baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "103")), 2.0f),
                         BooleanClause.Occur.SHOULD);
-                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "court")), 1.5f),
+
+                // Legal / court vocabulary
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "court")), 1.8f),
                         BooleanClause.Occur.SHOULD);
-                baseBuilder.add(
-                        new BoostQuery(new TermQuery(new Term("BODY", "trial")), 1.5f),
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "trial")), 2.0f),
                         BooleanClause.Occur.SHOULD);
-                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "lawsuit")), 1.5f),
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "lawsuit")), 2.0f),
                         BooleanClause.Occur.SHOULD);
-                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "verdict")), 1.5f),
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "verdict")), 2.0f),
                         BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "indictment")), 2.0f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "compensation")), 1.8f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "damages")), 1.8f),
+                        BooleanClause.Occur.SHOULD);
+                baseBuilder.add(new BoostQuery(new TermQuery(new Term("BODY", "settlement")), 1.5f),
+                        BooleanClause.Occur.SHOULD);
+
+                // Lightly steer away from purely diplomatic jousting (narrative says not
+                // relevant)
+                baseBuilder.add(new TermQuery(new Term("BODY", "diplomatic")), BooleanClause.Occur.MUST_NOT);
             }
 
             // Topic 419: recycled automobile tires – boosting scrap/recycling vocab
