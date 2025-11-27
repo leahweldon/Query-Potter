@@ -52,7 +52,9 @@ public class Searcher {
     private static final int PRF_FEEDBACK_DOCS = 50; // how many top docs to use as feedback
     private static final int PRF_EXPANSION_DOCS = 20; // how many of those docs to read terms from
     private static final int PRF_EXPANSION_TERMS = 30; // how many expansion terms to add
-    private static final float PRF_EXPANSION_BOOST = 1.5f;
+    // We have large boosts coming from some of the queries, and longer documents dilute the individual contributions
+    // from PRF terms. Running a high boost here means that the impact of using PRF is meaningful.
+    private static final float PRF_EXPANSION_BOOST = 4.6f;
 
     private final Analyzer analyzer;
     private final Similarity similarity;
