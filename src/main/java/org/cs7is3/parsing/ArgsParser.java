@@ -36,7 +36,7 @@ public class ArgsParser {
             ArgSpec.optional("--query", QueryGeneratorFactory.QueryMode::valueOf, Defaults.QUERY_MODE),
             ArgSpec.optional("--query-parser", QueryGeneratorFactory.QueryParserMode::valueOf, Defaults.QUERY_PARSER));
     private static final List<ArgSpec<?>> EVALUATE_ARGS = List.of(DOCS_ARG, TOPICS_ARG,
-            ArgSpec.required("--qrels", Paths::get), NUM_DOCS_ARG);
+            ArgSpec.required("--qrels", Paths::get), NUM_DOCS_ARG, ArgSpec.optional("--index", Boolean::parseBoolean, true));
 
     private ArgsParser() {
     }
@@ -63,7 +63,8 @@ public class ArgsParser {
                     args.get("--docs", Path.class),
                     args.get("--topics", Path.class),
                     args.get("--qrels", Path.class),
-                    args.get("--numDocs", Integer.class));
+                    args.get("--numDocs", Integer.class),
+                    args.get("--index", Boolean.class));
             return builder.setEvaluate(evaluate).build();
         }
         if (mode.equals(Mode.INDEX)) {
@@ -194,7 +195,7 @@ public class ArgsParser {
                 QueryGeneratorFactory.QueryMode queryMode, QueryGeneratorFactory.QueryParserMode queryParserMode) {
         }
 
-        public record Evaluate(Path docs, Path topics, Path qrelsFile, int numDocs) {
+        public record Evaluate(Path docs, Path topics, Path qrelsFile, int numDocs, boolean index) {
         }
 
         public abstract Optional<Index> index();

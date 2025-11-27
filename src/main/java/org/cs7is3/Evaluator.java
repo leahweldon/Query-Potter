@@ -65,9 +65,13 @@ public class Evaluator {
                 System.out.printf("Building index for [analyzer=%s, similarity=%s]...\n", analyzerMode, similarityMode);
                 var future = CompletableFuture.supplyAsync(() -> {
                     try {
-                        var indexer = new Indexer(key.analyzer(), key.similarity());
-                        indexer.buildIndex(args.docs(), key.path());
-                        System.out.printf("Index complete for [analyzer=%s, similarity=%s]...\n", analyzerMode, similarityMode);
+                        if (args.index()) {
+                            var indexer = new Indexer(key.analyzer(), key.similarity());
+                            indexer.buildIndex(args.docs(), key.path());
+                            System.out.printf("Index complete for [analyzer=%s, similarity=%s]...\n", analyzerMode, similarityMode);
+                        } else {
+                            System.out.printf("Skipping index building for [analyzer=%s, similarity=%s]...\n", analyzerMode, similarityMode);
+                        }
                         return true;
                     } catch (IOException e) {
                         throw new UncheckedIOException(e);
