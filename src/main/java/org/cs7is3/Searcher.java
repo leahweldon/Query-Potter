@@ -45,9 +45,10 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Searcher {
-    // Empirical value used for RRF, set to 60.0 per Cormack et. al (2009, DOI:
-    // 10.1145/1571941.1572114).
-    private static final Double K = 60.0;
+    // Empirical value used for RRF, originally set to 60.0 per Cormack et. al (2009, DOI:
+    // 10.1145/1571941.1572114). Empirically we found that using a value of 100 was more successful, likely due to the
+    // larger number of input queries per topic, meaning we want a smoother drop-off.
+    private static final Double K = 100.0;
     // PRF configuration: these can be tuned later.
     private static final int PRF_FEEDBACK_DOCS = 50; // how many top docs to use as feedback
     private static final int PRF_EXPANSION_DOCS = 20; // how many of those docs to read terms from
