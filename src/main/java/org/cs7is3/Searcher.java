@@ -173,6 +173,7 @@ public class Searcher {
                 // Focus on BODY & TITLE as feedback fields
                 accumulateTermsFromField(analyzer, termScores, "BODY", doc.get("BODY"));
                 accumulateTermsFromField(analyzer, termScores, "TITLE", doc.get("TITLE"));
+                accumulateTermsFromField(analyzer, termScores, "AUTHOR", doc.get("AUTHOR"));
             }
 
             // TF×IDF scoring
