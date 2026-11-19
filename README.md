@@ -2,7 +2,7 @@
 
 A Lucene search engine for TREC news retrieval, built around query formulation: field-aware weighting, narrative cleaning, pseudo-relevance feedback and Reciprocal Rank Fusion on top of tuned BM25.
 
-![Java 17](https://img.shields.io/badge/Java-17-orange) ![Lucene 9.12](https://img.shields.io/badge/Apache%20Lucene-9.12-blue) ![Maven](https://img.shields.io/badge/build-Maven-c71a36)
+[![Build](https://github.com/leahweldon/Query-Potter/actions/workflows/build.yml/badge.svg)](https://github.com/leahweldon/Query-Potter/actions/workflows/build.yml) ![Java 17](https://img.shields.io/badge/Java-17-orange) ![Lucene 9.12](https://img.shields.io/badge/Apache%20Lucene-9.12-blue) ![Maven](https://img.shields.io/badge/build-Maven-c71a36)
 
 Group 27's project for CS7IS3 Information Retrieval & Web Search at Trinity College Dublin (2025). The system indexes four TREC news collections — *Financial Times*, *Federal Register*, *Foreign Broadcast Information Service* and *Los Angeles Times* — into a unified schema, and returns 1,000 ranked documents for each of 50 TREC topics (401–450) in standard TREC run format.
 
